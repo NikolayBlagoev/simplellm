@@ -52,14 +52,15 @@ class LLama(nn.Module):
 
 
 class LLamaStage(nn.Module):
-    def __init__(self, dmodel, num_heads, freq_cis, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, device = "cuda") -> None:
+    def __init__(self, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, device = "cuda") -> None:
         super().__init__()
         self.transformers = []
+        self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2)
         for _ in range(n_layers):
             self.transformers.append(TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
-                    freq_cis=freq_cis,
+                    freq_cis=self.freqs_cis,
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
