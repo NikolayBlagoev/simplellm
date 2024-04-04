@@ -1,7 +1,7 @@
 from itertools import cycle
 import torch
 from datasets import load_dataset
-from ezllm.tokenizers.abstracttokenizer import AbstractTokenizer
+from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 
 class Wikipedia_Dataset(IterableDataset):

@@ -1,5 +1,5 @@
 from sentencepiece import SentencePieceProcessor
-from ezllm.tokenizers.abstracttokenizer import AbstractTokenizer
+from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 import requests
 import os
 

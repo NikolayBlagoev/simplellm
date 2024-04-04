@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='ezllm',
+    name='simplellm',
     version='0.0.1',    
     description='Build LLMs easily',
     url='https://github.com/NikolayBlagoev/ez-llm',
