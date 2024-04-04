@@ -2,9 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='simplellm',
-    version='0.0.1',    
+    version='0.0.2',    
     description='Build LLMs easily',
-    url='https://github.com/NikolayBlagoev/ez-llm',
+    url='https://github.com/NikolayBlagoev/simplellm',
     author='Nikolay Blagoev',
     author_email='nickyblagoev@gmail.com',
     license='MIT License',
