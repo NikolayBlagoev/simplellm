@@ -10,11 +10,11 @@ from torch import nn
 
 
 class RMSNorm(torch.nn.Module):
-    def __init__(self, dim: int, eps: float = 1e-6):
+    def __init__(self, dim: int, eps: float = 1e-6, device = "cuda"):
         
         super().__init__()
         self.eps = eps
-        self.weight = nn.Parameter(torch.ones(dim))
+        self.weight = nn.Parameter(torch.ones(dim)).to(device)
 
     def _norm(self, x):
     
@@ -34,7 +34,13 @@ def precompute_freqs_cis(dim: int, seq_len: int, theta: float = 10000.0):
     return freqs_cis
 
 
-
+def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
+    
+    ndim = x.ndim
+    assert 0 <= 1 < ndim
+    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
+    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
+    return freqs_cis.view(*shape)
 def apply_rotary_emb(
     xq: torch.Tensor,
     xk: torch.Tensor,
@@ -43,11 +49,11 @@ def apply_rotary_emb(
     
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-    
+    freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
+    # print(xq_.shape, freqs_cis.shape)
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
     return xq_out.type_as(xq), xk_out.type_as(xk)
-
 
 class Attention(nn.Module):
    
@@ -86,19 +92,19 @@ class Attention(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        start_p: int,
-        seq_l: int,
+        start_p: int = 0,
         mask: Optional[torch.Tensor] = None
     ):
         
         bsz, seqlen, _ = x.shape
+        
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
         xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
         xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
 
-        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=self.freq_cis[start_p: start_p+seq_l])
+        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=self.freq_cis[start_p: start_p+seqlen])
         keys = xk
         values = xv
         xq = xq.transpose(1, 2)  # (bs, n_local_heads, seqlen, head_dim)
@@ -154,19 +160,19 @@ class TransformerBlock(nn.Module):
             ffn_dim_multiplier=ffn_dim_multiplier,
         )
         
-        self.attention_norm = RMSNorm(dmodel, eps=norm_eps)
-        self.ffn_norm = RMSNorm(dmodel, eps=norm_eps)
+        self.attention_norm = RMSNorm(dmodel, eps=norm_eps, device=device)
+        self.ffn_norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.freqs_cis = None
 
     def forward(
         self,
         x: torch.Tensor,
-        start_p,
-        seq_l,
+        start_p = 0,
         mask: Optional[torch.Tensor] = None
     ):
+        
         h = x + self.attention.forward(
-            self.attention_norm(x), start_p, seq_l, mask
+            self.attention_norm(x), start_p, mask
         )
         out = h + self.feed_forward.forward(self.ffn_norm(h))
         return out
@@ -174,12 +180,15 @@ class TransformerBlock(nn.Module):
 
 
 class LLamaEmbedding(nn.Module):
-    def __init__(self, vocab_size, dmodel) -> None:
+    def __init__(self, vocab_size, dmodel, padding_idx = None) -> None:
         super().__init__()
         
-        self.tok_embeddings = nn.Embedding(vocab_size, dmodel)
+        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx)
+        print("MAKING EMGEDDING WITH ",dmodel)
+        print(padding_idx)
         self.vocab_size = vocab_size
     def forward(self, x):
+        print("SHAPE",x.shape)
         return self.tok_embeddings(x)
 
 
@@ -187,9 +196,9 @@ class LLamaClassification(nn.Module):
     def __init__(self, vocab_size, dmodel, norm_eps=1e-5, type: Literal["cross_entropy", "seq_2_seq"] = "cross_entropy", device = "cuda") -> None:
         super().__init__()
         self.type = type
-        self.norm1 = RMSNorm(dmodel, eps=norm_eps).to(device)
+        self.norm1 = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-        self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000])
+        self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000],device=device)
 
     def forward(self, x, targets):
         if self.type == "cross_entropy":
@@ -200,6 +209,6 @@ class LLamaClassification(nn.Module):
             
             shifted_x = x[..., :-1, :].contiguous()
             shifted_targets = targets[..., 1:].contiguous()
-            return self.sfmx(shifted_x.view(-1, self.norm1.in_features), shifted_targets.view(-1)).loss
+            return self.sfmx(shifted_x.view(-1, self.sfmx.in_features), shifted_targets.view(-1)).loss
         else:
             raise NotImplemented(f"Not a valid method ${self.type}")

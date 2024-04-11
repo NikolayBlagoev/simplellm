@@ -1,9 +1,12 @@
 from setuptools import setup, find_packages
-
+with open("README.md", encoding="utf-8") as f:
+    long_description = f.read()
 setup(
     name='simplellm',
     version='0.0.2',    
     description='Build LLMs easily',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/NikolayBlagoev/simplellm',
     author='Nikolay Blagoev',
     author_email='nickyblagoev@gmail.com',

@@ -12,10 +12,10 @@ class SPTokenizer(AbstractTokenizer):
             self.sp_model.load(tokenizer_path)
         else:
             
-            if not os.path.isfile('tokenizer.model'):
+            if not os.path.isfile('llama-tokenizer.model'):
                 
                 response = requests.get('https://huggingface.co/togethercomputer/LLaMA-2-7B-32K/resolve/main/tokenizer.model?download=true', stream=True)
-                with open('tokenizer.model','wb') as output:
+                with open('llama-tokenizer.model','wb') as output:
                     print("downloading to ", os.path.abspath(output.name))
                     output.write(response.content)
             
@@ -23,7 +23,7 @@ class SPTokenizer(AbstractTokenizer):
         self.vocab_size: int = self.sp_model.vocab_size()
         self.bos_id: int = self.sp_model.bos_id()
         self.eos_id: int = self.sp_model.eos_id()
-        self.pad_id: int = self.sp_model.pad_id()
+        self.pad_id: int = 0
         
 
     def encode(self, txt: str) -> list[int]:

@@ -1,6 +1,6 @@
-from simplellm.dataloaders import Wikipedia_Dataset
+from simplellm.dataloaders import Tiny_Shakespeare
 from simplellm.tokenizers import SPTokenizer
-wp = Wikipedia_Dataset(SPTokenizer(),batch_size = 500, seq_l=512)
+wp = Tiny_Shakespeare(SPTokenizer(),batch_size = 10, seq_l=512)
 
 for i, d in enumerate(wp):
     

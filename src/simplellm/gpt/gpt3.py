@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from gptbase import *
+from simplellm.gpt.gptbase import *
 
 class GPTStage(object):
     def __init__(self, dmodel, num_heads, dim_feedforward = 0, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, device = "cuda", n_layers = 4) -> None:
