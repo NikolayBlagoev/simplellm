@@ -14,7 +14,7 @@ class RMSNorm(torch.nn.Module):
         
         super().__init__()
         self.eps = eps
-        self.weight = nn.Parameter(torch.ones(dim)).to(device)
+        self.weight = nn.Parameter(torch.ones(dim,device=device))
 
     def _norm(self, x):
     
@@ -23,6 +23,7 @@ class RMSNorm(torch.nn.Module):
     def forward(self, x):
         
         output = self._norm(x.float()).type_as(x)
+        
         return output * self.weight
 
 def precompute_freqs_cis(dim: int, seq_len: int, theta: float = 10000.0):
@@ -57,7 +58,7 @@ def apply_rotary_emb(
 
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, freq_cis, num_kv_heads = None, device = "cpu"):
+    def __init__(self, dmodel, num_heads, freq_cis, num_kv_heads = None, device = "cuda"):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
@@ -66,22 +67,26 @@ class Attention(nn.Module):
         self.wq = nn.Linear(
             dmodel,
             num_heads * self.head_dim,
-            bias=False
+            bias=False,
+            device=device
         )
         self.wk = nn.Linear(
             dmodel,
             self.n_kv_heads * self.head_dim,
-            bias=False
+            bias=False,
+            device=device
         )
         self.wv = nn.Linear(
             dmodel,
             self.n_kv_heads * self.head_dim,
-            bias=False
+            bias=False,
+            device=device
         )
         self.wo = nn.Linear(
             num_heads * self.head_dim,
             dmodel,
-            bias=False
+            bias=False,
+            device=device
         )
         
         
@@ -126,6 +131,7 @@ class FeedForward(nn.Module):
         hidden_dim: int,
         multiple_of: int,
         ffn_dim_multiplier: Optional[float],
+        device = "cuda"
     ):
         
         super().__init__()
@@ -136,11 +142,11 @@ class FeedForward(nn.Module):
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
 
         self.w1 = nn.Linear(
-            dim, hidden_dim, bias=False)
+            dim, hidden_dim, bias=False,device=device)
         self.w2 = nn.Linear(
-            hidden_dim, dim, bias=False)
+            hidden_dim, dim, bias=False,device=device)
         self.w3 = nn.Linear(
-            dim, hidden_dim, bias=False)
+            dim, hidden_dim, bias=False,device=device)
 
     def forward(self, x):
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
@@ -158,6 +164,7 @@ class TransformerBlock(nn.Module):
             hidden_dim= 4 * dmodel,
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
+            device=device
         )
         
         self.attention_norm = RMSNorm(dmodel, eps=norm_eps, device=device)
@@ -180,10 +187,10 @@ class TransformerBlock(nn.Module):
 
 
 class LLamaEmbedding(nn.Module):
-    def __init__(self, vocab_size, dmodel, padding_idx = None) -> None:
+    def __init__(self, vocab_size, dmodel, padding_idx = None, device = "cuda") -> None:
         super().__init__()
         
-        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx)
+        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         print("MAKING EMGEDDING WITH ",dmodel)
         print(padding_idx)
         self.vocab_size = vocab_size
@@ -209,6 +216,7 @@ class LLamaClassification(nn.Module):
             
             shifted_x = x[..., :-1, :].contiguous()
             shifted_targets = targets[..., 1:].contiguous()
+            
             return self.sfmx(shifted_x.view(-1, self.sfmx.in_features), shifted_targets.view(-1)).loss
         else:
             raise NotImplemented(f"Not a valid method ${self.type}")

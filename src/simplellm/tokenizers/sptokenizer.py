@@ -19,7 +19,7 @@ class SPTokenizer(AbstractTokenizer):
                     print("downloading to ", os.path.abspath(output.name))
                     output.write(response.content)
             
-            self.sp_model.load('tokenizer.model')
+            self.sp_model.load('llama-tokenizer.model')
         self.vocab_size: int = self.sp_model.vocab_size()
         self.bos_id: int = self.sp_model.bos_id()
         self.eos_id: int = self.sp_model.eos_id()
