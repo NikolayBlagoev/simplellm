@@ -8,7 +8,7 @@ class Tiny_Shakespeare(IterableDataset):
     
 
     def __init__(self, tokenizer: AbstractTokenizer, batch_size = 5_000, seq_l=2048):
-        dataset = load_dataset("tiny_shakespeare")["train"]
+        dataset = load_dataset("tiny_shakespeare", trust_remote_code=True)["train"]
         #iterable_dataset = dataset.to_iterable_dataset(num_shards=64)
         iterable_dataset = dataset
         self.batch_size = batch_size

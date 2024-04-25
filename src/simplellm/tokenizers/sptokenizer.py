@@ -13,17 +13,20 @@ class SPTokenizer(AbstractTokenizer):
         else:
             
             if not os.path.isfile('llama-tokenizer.model'):
-                
+                print("WE DONT HAVE TOKENIZER")
                 response = requests.get('https://huggingface.co/togethercomputer/LLaMA-2-7B-32K/resolve/main/tokenizer.model?download=true', stream=True)
                 with open('llama-tokenizer.model','wb') as output:
                     print("downloading to ", os.path.abspath(output.name))
                     output.write(response.content)
-            
+            print("WE HAVE TOKENIZER")
             self.sp_model.load('llama-tokenizer.model')
+            print("loaded tokenizer")
+        print(self.sp_model)
         self.vocab_size: int = self.sp_model.vocab_size()
         self.bos_id: int = self.sp_model.bos_id()
         self.eos_id: int = self.sp_model.eos_id()
         self.pad_id: int = 0
+        print("DONE")
         
 
     def encode(self, txt: str) -> list[int]:
