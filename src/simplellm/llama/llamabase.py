@@ -195,7 +195,7 @@ class LLamaEmbedding(nn.Module):
         print(padding_idx)
         self.vocab_size = vocab_size
     def forward(self, x):
-        print("SHAPE",x.shape)
+        # print("SHAPE",x.shape)
         return self.tok_embeddings(x)
 
 
@@ -205,18 +205,22 @@ class LLamaClassification(nn.Module):
         self.type = type
         self.norm1 = RMSNorm(dmodel, eps=norm_eps,device=device)
         
+        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000],device=device)
 
     def forward(self, x, targets):
         if self.type == "cross_entropy":
-            return nn.functional.cross_entropy(x.view(-1, x.size(-1)), targets.view(-1))
+            x = self.norm1(x)
+            x = self.lm_head(x)
+            x = torch.swapaxes(x, 1, 2)
+            return nn.functional.cross_entropy(x, targets)
         elif self.type == "seq_2_seq":
             # from : https://github.com/DS3Lab/DT-FM
             x = self.norm1(x)
             
             shifted_x = x[..., :-1, :].contiguous()
             shifted_targets = targets[..., 1:].contiguous()
-            
+            # print(x.shape, shifted_x.shape, shifted_targets.shape, targets.shape)
             return self.sfmx(shifted_x.view(-1, self.sfmx.in_features), shifted_targets.view(-1)).loss
         else:
             raise NotImplemented(f"Not a valid method ${self.type}")

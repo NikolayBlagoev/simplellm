@@ -28,16 +28,25 @@ class Wikipedia_Dataset(IterableDataset):
     def get_data(self):
         btch = []
         ret = [self.tokenizer.bos_id]
+        target = []
+        trgt_btch = []
         for sentence in self.iterable_dataset:
             ret += sentence['text']
+            target += sentence['text']
             #print(sentence)
-            while len(ret) >= self.seq_l:
+            while len(ret) >= self.seq_l + 1:
                 curr = ret[:self.seq_l]
-                ret = [self.tokenizer.bos_id] + ret[self.seq_l:]
+                curr2 = target[:self.seq_l]
+                ret = ret[self.seq_l:]
+                target = target[self.seq_l:]
                 btch.append(curr)
-            if len(btch) == self.batch_size:
-                yield torch.tensor(btch)
-                btch = []
+                
+                trgt_btch.append(curr2)
+                
+                if len(btch) == self.batch_size:
+                    yield torch.tensor(btch), torch.tensor(trgt_btch)
+                    btch = []
+                    trgt_btch = []
 
     def t(self, i):
         res = [t["text"] for t in i]
@@ -64,5 +73,5 @@ class Wikipedia_Dataset(IterableDataset):
     def get_stream(self):
         return cycle(self.get_data())
     def __iter__(self):
-        return iter(self.dataset)
+        return cycle(self.get_data())
 
