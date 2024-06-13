@@ -7,7 +7,7 @@ class GPTBlock(nn.Module):
         super().__init__()
         if dim_feedforward == 0:
             dim_feedforward = dmodel * 4
-        self.multihead_attn = nn.MultiheadAttention(embed_dim = dmodel, num_heads = num_heads, bias=True, dim_feedforward = dim_feedforward, batch_first = True).to(device)
+        self.multihead_attn = nn.MultiheadAttention(embed_dim = dmodel, num_heads = num_heads, bias=True, batch_first = True).to(device)
         self.norm1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         self.norm2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         self.register_buffer("masked_attention",(1 - torch.tril(torch.ones(ctx_size, ctx_size))).to(device = device, dtype=torch.bool))
@@ -15,7 +15,7 @@ class GPTBlock(nn.Module):
             nn.Linear(dmodel, dim_feedforward),
             nn.GELU(),
             nn.Linear(dim_feedforward, dmodel),
-            nn.DropOut(dropout_prob)
+            nn.Dropout(dropout_prob)
         ).to(device)
     def forward(self, x):
         _, tkns, _ = x.size()
@@ -30,9 +30,9 @@ class GPTBlock(nn.Module):
     
 
 class GPTEmbedding(nn.Module):
-    def __init__(self, vocab_size, dmodel, ctx_size = 2048, device = "cuda") -> None:
+    def __init__(self, vocab_size, dmodel, ctx_size = 2048, padding_idx = None, device = "cuda") -> None:
         super().__init__()
-        self.word_embedding = nn.Embedding(vocab_size, dmodel, padding_idx=None, max_norm=None,  norm_type=2, scale_grad_by_freq=False, sparse=False).to(device)
+        self.word_embedding = nn.Embedding(vocab_size, dmodel, padding_idx=padding_idx, max_norm=None,  norm_type=2, scale_grad_by_freq=False, sparse=False).to(device)
         self.pos_embedding = nn.Embedding(ctx_size, dmodel).to(device)
     
     def forward(self, x, positions = None):
@@ -48,20 +48,27 @@ class GPTClassification(nn.Module):
     def __init__(self, vocab_size, dmodel, norm_eps=1e-5, type: Literal["cross_entropy", "seq_2_seq"] = "cross_entropy", device = "cuda") -> None:
         super().__init__()
         self.type = type
+        
+        
+        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         self.norm1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         
-        self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000])
+        self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000],device=device)
 
     def forward(self, x, targets):
         if self.type == "cross_entropy":
-            return nn.functional.cross_entropy(x.view(-1, x.size(-1)), targets.view(-1))
+            x = self.norm1(x)
+            x = self.lm_head(x)
+            x = torch.swapaxes(x, 1, 2)
+            return nn.functional.cross_entropy(x, targets)
         elif self.type == "seq_2_seq":
             # from : https://github.com/DS3Lab/DT-FM
             x = self.norm1(x)
             
             shifted_x = x[..., :-1, :].contiguous()
             shifted_targets = targets[..., 1:].contiguous()
-            return self.sfmx(shifted_x.view(-1, self.norm1.in_features), shifted_targets.view(-1)).loss
+            # print(x.shape, shifted_x.shape, shifted_targets.shape, targets.shape)
+            return self.sfmx(shifted_x.view(-1, self.sfmx.in_features), shifted_targets.view(-1)).loss
         else:
             raise NotImplemented(f"Not a valid method ${self.type}")
 
