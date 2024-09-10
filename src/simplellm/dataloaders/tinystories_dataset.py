@@ -27,6 +27,8 @@ class TinyStories(IterableDataset):
         return {"text": self.tokenizer.encode(t["text"])}
     def get_data(self):
         print("getting data...")
+        
+        
         btch = []
         ret = [self.tokenizer.bos_id]
         target = []
@@ -49,6 +51,8 @@ class TinyStories(IterableDataset):
                     yield torch.tensor(btch), torch.tensor(trgt_btch)
                     btch = []
                     trgt_btch = []
+        self.iterable_dataset = iterable_dataset.map(self.tokenization, batched=True, batch_size=batch_size)
+        self.dataset =  torch.utils.data.DataLoader(self.iterable_dataset, batch_size= batch_size, collate_fn = self.t)
 
     def t(self, i):
         
