@@ -1,6 +1,6 @@
 # Adapted form: https://github.com/meta-llama/llama/blob/main/llama/model.py
 import math
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, List
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -153,10 +153,11 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, freq_cis, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, freq_cis, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = 0, device = "cuda"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
+        self.idx = idx
         self.head_dim = dmodel // num_heads
         self.attention = Attention(dmodel,num_heads,freq_cis,device=device)
         self.feed_forward = FeedForward(
@@ -175,9 +176,12 @@ class TransformerBlock(nn.Module):
         self,
         x: torch.Tensor,
         start_p = 0,
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
+        to_skip: List[int] = []
     ):
-        
+        if self.idx in to_skip:
+            
+            return x
         h = x + self.attention.forward(
             self.attention_norm(x), start_p, mask
         )

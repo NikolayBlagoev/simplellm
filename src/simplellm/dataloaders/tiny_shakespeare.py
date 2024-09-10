@@ -36,7 +36,7 @@ class Tiny_Shakespeare(IterableDataset):
             loc_batch_size  = min(self.batch_size, self.ln - i)
             # for k in range(loc_batch_size):
             #     print(self.iterable_dataset[i+k*self.seq_l:i+ k*self.seq_l+self.seq_l].shape, i+k*self.seq_l,i+ k*self.seq_l+self.seq_l)
-            yield torch.stack([self.iterable_dataset[i+k:i+ k+self.seq_l] for k in range(loc_batch_size)])
+            yield torch.stack([self.iterable_dataset[i+k:i+k+self.seq_l] for k in range(loc_batch_size)])
             i += self.batch_size
         raise StopIteration
     def t(self, i):

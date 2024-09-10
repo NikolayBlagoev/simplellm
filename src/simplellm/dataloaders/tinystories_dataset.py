@@ -4,11 +4,11 @@ from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 
-class Wikipedia_Dataset(IterableDataset):
+class TinyStories(IterableDataset):
     
 
     def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train'):
-        dataset = load_dataset("wikipedia", "20220301.en", split=split, streaming = streaming, trust_remote_code=True)
+        dataset = load_dataset("roneneldan/TinyStories", split=split, streaming = streaming, trust_remote_code=True)
         
         iterable_dataset = dataset.shuffle(buffer_size=10_000)
         self.batch_size = batch_size
@@ -18,24 +18,25 @@ class Wikipedia_Dataset(IterableDataset):
         self.tokenizer = tokenizer
         self.seq_l = seq_l
         self.padding = [self.tokenizer.pad_id for _ in range(self.seq_l)]
-        print("WIKIPEDIA DATASET LOADED...")
+        print("TINYSTORIES DATASET LOADED...")
     def tokenization(self, t):
         
         #print(t["text"])
-        res = self.tokenizer.encode(t["text"])
         
-        return {"id": t["id"],"text": res }
+        
+        return {"text": self.tokenizer.encode(t["text"])}
     def get_data(self):
-        
+        print("getting data...")
         btch = []
         ret = [self.tokenizer.bos_id]
         target = []
         trgt_btch = []
         for sentence in self.iterable_dataset:
-            ret += sentence['text']
-            target += sentence['text']
+            
+            ret += sentence["text"]
+            target += sentence["text"]
             #print(sentence)
-            while len(ret) >= self.seq_l:
+            while len(ret) >= self.seq_l + 1:
                 curr = ret[:self.seq_l]
                 curr2 = target[:self.seq_l]
                 ret = ret[1:]

@@ -1,14 +1,21 @@
-from simplellm.llama.llamabase import *
+from simplellm.skipllama.llamabase import *
 
 import torch
 
 from torch import nn
+class CustomSeq(nn.Sequential):
+    def forward(self, *inputs):
+        x, start_p, mask, to_skip = inputs
+        for module in self._modules.values():
+            x = module(x, start_p, mask, to_skip)
+        return x
+
 class LLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 4, ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
         self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = nn.Sequential(
+        self.transformers = CustomSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -17,12 +24,13 @@ class LLama(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    idx = i,
                     device = device
-                ) for _ in range(n_layers)
+                ) for i in range(n_layers)
             ])
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.ln = nn.Linear(dmodel, vocab_size, bias=False,device=device)
-    def forward(self, x):
+    def forward(self, x, to_skip = []):
         _, seq_l = x.shape
         h = self.embedding(x)
         # print(h.type())
@@ -42,7 +50,7 @@ class LLama(nn.Module):
         #         torch.zeros((seq_l, start_p), device=x.device),
         #         mask
         #     ]).type_as(h)
-        h = self.transformers(h)
+        h = self.transformers(h,0,None,to_skip)
         h = self.norm(h)
         output = self.ln(h).float()
         return output
