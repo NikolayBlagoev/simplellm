@@ -15,9 +15,10 @@ ts = TinyStories(tkns,batch_size = 64 // pth_num, seq_l=seq_l)
 net = LLama(tkns.vocab_size,dmodel=256,num_heads=8,multiple_of=256,ctx_size=seq_l,n_layers=16)
 
 op = optim.SGD(net.parameters(),lr=1e-3,momentum=0,dampening=0,weight_decay=0,nesterov=False)
-loader = iter(ts)
+
 lr = 1e-3
 for _ in range(10):
+    loader = iter(ts) 
     for i in range(8000//pth_num):
         grad_acc = dict()
         grad_avg = dict()
