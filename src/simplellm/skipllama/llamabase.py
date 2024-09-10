@@ -182,6 +182,7 @@ class TransformerBlock(nn.Module):
         if self.idx in to_skip:
             
             return x
+        
         h = x + self.attention.forward(
             self.attention_norm(x), start_p, mask
         )
