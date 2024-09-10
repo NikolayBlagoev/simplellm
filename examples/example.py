@@ -9,10 +9,10 @@ import torch.nn.functional as F
 pth_num = 4
 num_to_activate = 8
 
-seq_l = 256
+seq_l = 128
 tkns = SPTokenizer()
 ts = TinyStories(tkns,batch_size = 64 // pth_num, seq_l=seq_l)
-net = LLama(tkns.vocab_size,dmodel=288,num_heads=8,multiple_of=512,ctx_size=seq_l,n_layers=16)
+net = LLama(tkns.vocab_size,dmodel=256,num_heads=8,multiple_of=256,ctx_size=seq_l,n_layers=16)
 
 op = optim.SGD(net.parameters(),lr=1e-3,momentum=0,dampening=0,weight_decay=0,nesterov=False)
 loader = iter(ts)
