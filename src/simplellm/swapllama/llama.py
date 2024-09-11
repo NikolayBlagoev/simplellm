@@ -35,7 +35,7 @@ class LLama(nn.Module):
         _, seq_l = x.shape
         h = self.embedding(x)
         
-        h = self.transformers(h,0,None)
+        h = self.transformers(h,0,None,exec_order)
         h = self.norm(h)
         output = self.ln(h).float()
         return output
