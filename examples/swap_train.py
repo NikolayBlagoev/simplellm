@@ -14,12 +14,12 @@ tkns = SPTokenizer()
 ts = TinyStories(tkns,batch_size = 64 // pth_num, seq_l=seq_l)
 net = LLama(tkns.vocab_size,dmodel=256,num_heads=8,multiple_of=256,ctx_size=seq_l,n_layers=16)
 
-op = optim.SGD(net.parameters(),lr=1e-3,momentum=0,dampening=0,weight_decay=0,nesterov=False)
+op = optim.SGD(net.parameters(),lr=4e-3/pth_num,momentum=0,dampening=0,weight_decay=0,nesterov=False)
 
 lr = 1e-3
 for _ in range(10):
     loader = iter(ts) 
-    for i in range(8000//pth_num):
+    for i in range(8000):
         grad_acc = dict()
         grad_avg = dict()
         loss_hist = []
@@ -35,8 +35,8 @@ for _ in range(10):
                 for _ in range(num_to_switch):
             
                     swp_idx = 0
-                    while swp_idx in swaps:
-                        swp_idx=random.randint(1,15)
+                    while swp_idx in swaps or swp_idx + 1 in swaps:
+                        swp_idx=random.randint(1,14)
                 
                     exec_order[swp_idx] = swp_idx + 1
                     exec_order[swp_idx+1] = swp_idx 
@@ -57,7 +57,7 @@ for _ in range(10):
         if i%10 == 0:
             print(sum(loss_hist)/len(loss_hist))
         if i%100 == 0:
-            save(net.state_dict(), "latest.pth")
+            save(net.state_dict(), f"swap_train_{pth_num}_{num_to_switch}.pth")
 
     
     

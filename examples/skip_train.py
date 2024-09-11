@@ -14,12 +14,12 @@ tkns = SPTokenizer()
 ts = TinyStories(tkns,batch_size = 64 // pth_num, seq_l=seq_l)
 net = LLama(tkns.vocab_size,dmodel=256,num_heads=8,multiple_of=256,ctx_size=seq_l,n_layers=16)
 
-op = optim.SGD(net.parameters(),lr=1e-3,momentum=0,dampening=0,weight_decay=0,nesterov=False)
+op = optim.SGD(net.parameters(),lr=4e-3/pth_num,momentum=0,dampening=0,weight_decay=0,nesterov=False)
 
 lr = 1e-3
 for _ in range(10):
     loader = iter(ts) 
-    for i in range(8000//pth_num):
+    for i in range(8000):
         grad_acc = dict()
         grad_avg = dict()
         loss_hist = []
@@ -29,7 +29,10 @@ for _ in range(10):
             x,y = next(loader)
             x = x.to("cuda")
             y = y.to("cuda")
-            to_skip = random.sample([i for i in range(1,16)],15-num_to_activate)
+            if num_to_activate < 15:
+                to_skip = random.sample([i for i in range(1,16)],15-num_to_activate)
+            else:
+                to_skip = []
             if i % 10 == 0:
                 to_skip = []
             x = net(x,to_skip)
@@ -46,7 +49,7 @@ for _ in range(10):
         if i%10 == 0:
             print(sum(loss_hist)/len(loss_hist))
         if i%100 == 0:
-            save(net.state_dict(), "latest.pth")
+            save(net.state_dict(), f"skip_train_{pth_num}_{num_to_activate}.pth")
 
     
     
