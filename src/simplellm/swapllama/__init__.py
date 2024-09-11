@@ -1,2 +1,2 @@
-from simplellm.skipllama.llama import *
-from simplellm.skipllama.llamabase import *
+from simplellm.swapllama.llama import *
+from simplellm.swapllama.llamabase import *
