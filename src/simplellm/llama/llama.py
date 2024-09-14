@@ -6,9 +6,9 @@ from torch import nn
 class LLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 4, ffn_dim_multiplier = None) -> None:
         super().__init__()
-        self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
+        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = nn.Sequential(
+        self.layers = nn.Sequential(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -22,15 +22,15 @@ class LLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
-        # self.ln = nn.Linear(dmodel, vocab_size, bias=False,device=device)
+        self.output = nn.Linear(dmodel, vocab_size, bias=False,device=device)
     def forward(self, x):
         _, seq_l = x.shape
         h = self.tok_embeddings(x)
         
-        h = self.transformers(h)
+        h = self.layers(h)
         h = self.norm(h)
-        # output = self.ln(h).float()
-        return h
+        output = self.output(h).float()
+        return output
 
 
 class SkipSeq(nn.Sequential):
@@ -45,19 +45,22 @@ class SkipSeq(nn.Sequential):
 
 class SwapSeq(nn.Sequential):
     def forward(self, *inputs):
-        x, start_p, mask, to_skip = inputs
-        for module in self._modules.values():
-            if module.idx in to_skip:
+        x, start_p, mask, order = inputs
+
+        for v in order:
+            if self._modules.get(v) == None:
                 continue
+            module = self._modules[v]
+            
             x = module(x, start_p, mask)
         return x
 
 class SkipLLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 4, ffn_dim_multiplier = None) -> None:
         super().__init__()
-        self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
+        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = SkipSeq(
+        self.layers = SkipSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -71,23 +74,23 @@ class SkipLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
-        # self.ln = nn.Linear(dmodel, vocab_size, bias=False,device=device)
+        self.output = nn.Linear(dmodel, vocab_size, bias=False,device=device)
     def forward(self, x, to_skip = []):
         _, seq_l = x.shape
         h = self.tok_embeddings(x)
         
-        h = self.transformers(h, 0, None, to_skip)
+        h = self.layers(h,0,None,to_skip)
         h = self.norm(h)
-        # output = self.ln(h).float()
-        return h
+        output = self.output(h).float()
+        return output
 
 
 class SwapLLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 4, ffn_dim_multiplier = None) -> None:
         super().__init__()
-        self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
+        self.tok_embeddings = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = SwapSeq(
+        self.layers = SwapSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -101,27 +104,15 @@ class SwapLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
-        # self.ln = nn.Linear(dmodel, vocab_size, bias=False,device=device)
+        self.output = nn.Linear(dmodel, vocab_size, bias=False,device=device)
     def forward(self, x, order = []):
         _, seq_l = x.shape
         h = self.tok_embeddings(x)
         
-        h = self.transformers(h,0,None,order)
+        h = self.layers(h,0,None,order)
         h = self.norm(h)
-        # output = self.ln(h).float()
-        return h
-
-
-
-
-
-class NextTokenLLama(nn.Module):
-    def __init__(self, LLAMA_TYPE, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
-        super().__init__()
-        self.model = LLAMA_TYPE(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,padding_idx,device,n_layers,ffn_dim_multiplier)
-        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
-    def forward(self, x):
-        return self.lm_head(self.model(x))
+        output = self.output(h).float()
+        return output
 
     
 

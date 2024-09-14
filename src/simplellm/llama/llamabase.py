@@ -141,15 +141,15 @@ class FeedForward(nn.Module):
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
 
-        self.gate_proj = nn.Linear(
+        self.w1 = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
-        self.down_proj = nn.Linear(
+        self.w2 = nn.Linear(
             hidden_dim, dim, bias=False,device=device)
-        self.up_proj = nn.Linear(
+        self.w3 = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
 
     def forward(self, x):
-        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 
 class TransformerBlock(nn.Module):
@@ -159,7 +159,7 @@ class TransformerBlock(nn.Module):
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
         self.attention = Attention(dmodel,num_heads,freq_cis,device=device)
-        self.mlp = FeedForward(
+        self.feed_forward = FeedForward(
             dim=dmodel,
             hidden_dim= 4 * dmodel,
             multiple_of=multiple_of,
@@ -169,8 +169,8 @@ class TransformerBlock(nn.Module):
         if idx == None:
             raise ValueError("Index cannot be none!")
         self.idx = idx
-        self.input_layernorm = RMSNorm(dmodel, eps=norm_eps, device=device)
-        self.post_attention_layernorm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        self.attention_norm = RMSNorm(dmodel, eps=norm_eps, device=device)
+        self.ffn_norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.freqs_cis = None
 
     def forward(
@@ -181,9 +181,9 @@ class TransformerBlock(nn.Module):
     ):
         
         h = x + self.attention.forward(
-            self.input_layernorm(x), start_p, mask
+            self.attention_norm(x), start_p, mask
         )
-        out = h + self.mlp.forward(self.post_attention_layernorm(h))
+        out = h + self.feed_forward.forward(self.ffn_norm(h))
         return out
 
 
