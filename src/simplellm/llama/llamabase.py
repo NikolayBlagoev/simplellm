@@ -141,34 +141,36 @@ class FeedForward(nn.Module):
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
 
-        self.w1 = nn.Linear(
+        self.gate_proj = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
-        self.w2 = nn.Linear(
+        self.down_proj = nn.Linear(
             hidden_dim, dim, bias=False,device=device)
-        self.w3 = nn.Linear(
+        self.up_proj = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
 
     def forward(self, x):
-        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, freq_cis, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, freq_cis, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
         self.attention = Attention(dmodel,num_heads,freq_cis,device=device)
-        self.feed_forward = FeedForward(
+        self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= 4 * dmodel,
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
             device=device
         )
-        
-        self.attention_norm = RMSNorm(dmodel, eps=norm_eps, device=device)
-        self.ffn_norm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        if idx == None:
+            raise ValueError("Index cannot be none!")
+        self.idx = idx
+        self.input_layernorm = RMSNorm(dmodel, eps=norm_eps, device=device)
+        self.post_attention_layernorm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.freqs_cis = None
 
     def forward(
@@ -179,9 +181,9 @@ class TransformerBlock(nn.Module):
     ):
         
         h = x + self.attention.forward(
-            self.attention_norm(x), start_p, mask
+            self.input_layernorm(x), start_p, mask
         )
-        out = h + self.feed_forward.forward(self.ffn_norm(h))
+        out = h + self.mlp.forward(self.post_attention_layernorm(h))
         return out
 
 
