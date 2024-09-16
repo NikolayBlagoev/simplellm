@@ -128,7 +128,7 @@ class LLama(nn.Module):
     def generate(self, inp, tokenizer, max_gen_len: int, *args):
         pad_id = tokenizer.pad_id
         tokens = torch.full((1, self.max_seq), pad_id, dtype=torch.long, device=self.device)
-        tokens[: inp.shape[0]] = inp
+        tokens[1,: inp.shape[0]] = inp
         head = 0
         eos_reached = False
         input_text_mask = tokens != pad_id
