@@ -29,7 +29,8 @@ class RoPE(nn.Module):
     def __init__(self, dim, theta=10000, device="cuda"):
         super().__init__()
         # dmodel // num_heads, ctx_size * 2
-        self.inv_freq = Parameter(1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim)))
+        
+        self.inv_freq = nn.Parameter(1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim)))
 
     @torch.no_grad()
     def forward(self, x,init_input):
