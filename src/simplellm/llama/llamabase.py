@@ -25,64 +25,65 @@ class RMSNorm(torch.nn.Module):
         output = self._norm(x.float()).type_as(x)
         
         return output * self.weight
+class RoPE(nn.Module):
+    def __init__(self, dim, theta=10000, device="cuda"):
+        super().__init__()
+        # dmodel // num_heads, ctx_size * 2
+        self.inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim))
 
-def precompute_freqs_cis(dim: int, seq_len: int, theta: float = 10000.0):
-    
-    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(seq_len, device=freqs.device)  # type: ignore
-    freqs = torch.outer(t, freqs).float()  # type: ignore
-    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
-    return freqs_cis
+    @torch.no_grad()
+    def forward(self, x,init_input):
+        
 
-
-def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
+        # Core RoPE block
+        inv_freq_expanded = self.inv_freq[None, :, None].float().expand(init_input.shape[0], -1, 1)
+        position_ids = torch.arange(0, init_input.shape[1], device=x.device).unsqueeze(0)
+        position_ids_expanded = position_ids[:, None, :].float()
+        freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(1, 2)
+        emb = torch.cat((freqs, freqs), dim=-1)
+        cos = emb.cos()
+        sin = emb.sin()
+        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
     
-    ndim = x.ndim
-    assert 0 <= 1 < ndim
-    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
-    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
-    return freqs_cis.view(*shape)
-def apply_rotary_emb(
-    xq: torch.Tensor,
-    xk: torch.Tensor,
-    freqs_cis: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+    def rot(self,x):
+        f = x[..., : x.shape[-1] // 2]
+        s = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-s, f), dim=-1)
     
-    xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-    freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
-    # print(xq_.shape, freqs_cis.shape)
-    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
-    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
-    return xq_out.type_as(xq), xk_out.type_as(xk)
+def repeat_intrleave(x, n):
+    if n == 1:
+        return x
+    b, num_kv, seq_len, head_dim = x.shape
+    x = x[:, :, None, :, :].expand(b, num_kv, n, seq_len, head_dim)
+    return x.reshape(b, num_kv * n, seq_len, head_dim)
 
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, freq_cis, num_kv_heads = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, num_kv_heads = None, device = "cuda"):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
         self.head_dim = dmodel // num_heads
         self.num_heads = num_heads
-        self.wq = nn.Linear(
+        self.q_proj = nn.Linear(
             dmodel,
             num_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.wk = nn.Linear(
+        self.k_proj = nn.Linear(
             dmodel,
             self.n_kv_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.wv = nn.Linear(
+        self.v_proj = nn.Linear(
             dmodel,
             self.n_kv_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.wo = nn.Linear(
+        self.o_proj = nn.Linear(
             num_heads * self.head_dim,
             dmodel,
             bias=False,
@@ -90,7 +91,7 @@ class Attention(nn.Module):
         )
         
         
-        self.freq_cis = freq_cis
+        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
         
         
 
@@ -103,25 +104,25 @@ class Attention(nn.Module):
         
         bsz, seqlen, _ = x.shape
         
-        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+        xq, xk, xv = self.q_proj(x), self.k_proj(x), self.v_proj(x)
 
-        xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim)
-        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
-        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
-
-        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=self.freq_cis[start_p: start_p+seqlen])
-        keys = xk
-        values = xv
-        xq = xq.transpose(1, 2)  # (bs, n_local_heads, seqlen, head_dim)
-        keys = keys.transpose(1, 2) # (bs, n_local_heads, cache_len + seqlen, head_dim)
-        values = values.transpose(1, 2) # (bs, n_local_heads, cache_len + seqlen, head_dim)
-        scores = torch.matmul(xq, keys.transpose(2, 3)) / math.sqrt(self.head_dim)
+        xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim).transpose(1, 2)
+        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        cos, sin = self.rotary_emb(xv,x)
+        cos = cos.unsqueeze(1)
+        sin = sin.unsqueeze(1)
+        xq = (xq * cos) + (self.rotary_emb.rot(xq) * sin)
+        xk = (xk * cos) + (self.rotary_emb.rot(xk) * sin)
+        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
+        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+        scores = torch.matmul(xq, xk.transpose(2, 3)) / math.sqrt(self.head_dim)
         if mask is not None:
             scores = scores + mask  # (bs, n_local_heads, seqlen, cache_len + seqlen)
         scores = F.softmax(scores.float(), dim=-1).type_as(xq)
-        output = torch.matmul(scores, values)  # (bs, n_local_heads, seqlen, head_dim)
+        output = torch.matmul(scores, xv)  # (bs, n_local_heads, seqlen, head_dim)
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
-        return self.wo(output)
+        return self.o_proj(output)
 
 
 class FeedForward(nn.Module):
@@ -141,25 +142,25 @@ class FeedForward(nn.Module):
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
 
-        self.w1 = nn.Linear(
+        self.gate_proj = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
-        self.w2 = nn.Linear(
+        self.down_proj = nn.Linear(
             hidden_dim, dim, bias=False,device=device)
-        self.w3 = nn.Linear(
+        self.up_proj = nn.Linear(
             dim, hidden_dim, bias=False,device=device)
 
     def forward(self, x):
-        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, freq_cis, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
-        self.attention = Attention(dmodel,num_heads,freq_cis,device=device)
-        self.feed_forward = FeedForward(
+        self.self_attn = Attention(dmodel,num_heads,device=device)
+        self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= 4 * dmodel,
             multiple_of=multiple_of,
@@ -169,8 +170,8 @@ class TransformerBlock(nn.Module):
         if idx == None:
             raise ValueError("Index cannot be none!")
         self.idx = idx
-        self.attention_norm = RMSNorm(dmodel, eps=norm_eps, device=device)
-        self.ffn_norm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        self.input_layernorm = RMSNorm(dmodel, eps=norm_eps, device=device)
+        self.post_attention_layernorm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.freqs_cis = None
 
     def forward(
@@ -180,10 +181,10 @@ class TransformerBlock(nn.Module):
         mask: Optional[torch.Tensor] = None
     ):
         
-        h = x + self.attention.forward(
-            self.attention_norm(x), start_p, mask
+        h = x + self.self_attn.forward(
+            self.input_layernorm(x), start_p, mask
         )
-        out = h + self.feed_forward.forward(self.ffn_norm(h))
+        out = h + self.mlp.forward(self.post_attention_layernorm(h))
         return out
 
 

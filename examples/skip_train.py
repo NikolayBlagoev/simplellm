@@ -1,18 +1,18 @@
 from simplellm.dataloaders import Tiny_Shakespeare
 from simplellm.tokenizers import SPTokenizer
 from simplellm.dataloaders import TinyStories
-from simplellm.skipllama import LLama,LLamaClassification
+from simplellm.llama import LLama,SkipLLama
 from torch import optim, save, no_grad
 import random
 import torch.nn.functional as F
 
 pth_num = 4
-num_to_activate = 8
+num_to_activate = 4
 
 seq_l = 128
 tkns = SPTokenizer()
 ts = TinyStories(tkns,batch_size = 64 // pth_num, seq_l=seq_l)
-net = LLama(tkns.vocab_size,dmodel=256,num_heads=8,multiple_of=256,ctx_size=seq_l,n_layers=16)
+net = LLama(SkipLLama,tkns.vocab_size,dmodel=128,num_heads=4,multiple_of=8,ctx_size=seq_l,n_layers=4)
 
 op = optim.SGD(net.parameters(),lr=4e-3/pth_num,momentum=0,dampening=0,weight_decay=0,nesterov=False)
 
@@ -29,8 +29,8 @@ for _ in range(10):
             x,y = next(loader)
             x = x.to("cuda")
             y = y.to("cuda")
-            if num_to_activate < 15:
-                to_skip = random.sample([i for i in range(1,16)],15-num_to_activate)
+            if num_to_activate < 4:
+                to_skip = random.sample([i for i in range(1,4)],4-num_to_activate)
             else:
                 to_skip = []
             if i % 10 == 0:
