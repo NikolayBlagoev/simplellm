@@ -3,6 +3,7 @@ from simplellm.llama.llamabase import *
 import torch
 from typing import Union
 from torch import nn
+import torch.nn.functional as F
 class CausalLLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
         super().__init__()
@@ -115,11 +116,57 @@ class SwapLLama(nn.Module):
 class LLama(nn.Module):
     def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None):
         super().__init__()
+        self.max_seq = ctx_size
+        self.device = device
         self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,padding_idx,device,n_layers,ffn_dim_multiplier)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
 
     def forward(self, x, *args):
         return self.lm_head(self.model(x,args))
+
+    @torch.inference_mode()
+    def generate(self, inp, tokenizer, max_gen_len: int, *args):
+        pad_id = tokenizer.pad_id
+        tokens = torch.full((1, self.max_seq), pad_id, dtype=torch.long, device=self.device)
+        tokens[: inp.shape[0]] = torch.tensor(inp, dtype=torch.long, device=self.device)
+        head = 0
+        eos_reached = False
+        input_text_mask = tokens != pad_id
+        
+
+        for cur_pos in range(inp.shape[0], inp.shape[0] + max_gen_len):
+            logits = self.model.forward(tokens[:, head:cur_pos],*args)
+            next_token = torch.argmax(logits[:, -1], dim=-1)
+
+            next_token = next_token.reshape(-1)
+            
+            next_token = torch.where(
+                input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
+            )
+            tokens[:, cur_pos] = next_token
+            
+            eos_reached |= (~input_text_mask[:, cur_pos]) & (
+                next_token == self.tokenizer.eos_id
+            )
+            
+            if all(eos_reached):
+                break
+
+        
+        out_tokens = []
+        for i, toks in enumerate(tokens.tolist()):
+
+            start = 0
+            toks = toks[start : len(inp) + max_gen_len]
+            
+            
+            if self.tokenizer.eos_id in toks:
+                eos_idx = toks.index(self.tokenizer.eos_id)
+                toks = toks[:eos_idx]
+                
+            out_tokens.append(toks)
+            
+        return out_tokens
     
 
 class LLamaStage(nn.Module):
