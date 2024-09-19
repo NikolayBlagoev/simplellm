@@ -4,12 +4,20 @@ import torch
 from typing import Union
 from torch import nn
 import torch.nn.functional as F
+class LLamaSeq(nn.Sequential):
+    def forward(self, *inputs):
+        x, start_p, mask, position_embeddings = inputs
+        for module in self._modules.values():
+            if module.idx in to_skip:
+                continue
+            x = module(x, start_p, mask, )
+        return x
 class CausalLLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
-        self.layers = nn.Sequential(
+        self.layers = LLamaSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -21,20 +29,22 @@ class CausalLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
+        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x, *args):
+    def forward(self, x, start_p = 0, mask = None, position_ids = None, *args):
         _, seq_l = x.shape
+        position_embeddings = self.rotary_emb(x,x)
         h = self.embed_tokens(x)
         
-        h = self.layers(h)
+        h = self.layers(h, start_p, mask, position_embeddings)
         h = self.norm(h)
         return h
 
 
 class SkipSeq(nn.Sequential):
     def forward(self, *inputs):
-        x, start_p, mask, to_skip = inputs
+        x, start_p, mask, position_embeddings , to_skip = inputs
         for module in self._modules.values():
             if module.idx in to_skip:
                 continue
@@ -44,7 +54,7 @@ class SkipSeq(nn.Sequential):
 
 class SwapSeq(nn.Sequential):
     def forward(self, *inputs):
-        x, start_p, mask, order = inputs
+        x, start_p, mask, position_embeddings , order = inputs
 
         for v in order:
             if self._modules.get(v) == None:
@@ -72,13 +82,15 @@ class SkipLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
+        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x, to_skip = []):
+    def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = []):
         _, seq_l = x.shape
+        position_embeddings = self.rotary_emb(x,x)
         h = self.embed_tokens(x)
         
-        h = self.layers(h,0,None,to_skip)
+        h = self.layers(h,start_p,mask,position_embeddings,to_skip)
         h = self.norm(h)
         return h
 
@@ -101,13 +113,14 @@ class SwapLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
+        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x, order = []):
+    def forward(self, x, start_p = 0, mask = None, position_ids = None, order = []):
         _, seq_l = x.shape
         h = self.embed_tokens(x)
-        
-        h = self.layers(h,0,None,order)
+        position_embeddings = self.rotary_emb(x,x)
+        h = self.layers(h, start_p, mask, position_embeddings, order)
         h = self.norm(h)
        
         return h

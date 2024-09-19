@@ -33,7 +33,7 @@ class RoPE(nn.Module):
         self.inv_freq = nn.Parameter(1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim)))
 
     @torch.no_grad()
-    def forward(self, x,init_input):
+    def forward(self, x,init_input, position_ids = None):
         
 
         # Core RoPE block
@@ -100,7 +100,8 @@ class Attention(nn.Module):
         self,
         x: torch.Tensor,
         start_p: int = 0,
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
+        position_embedding = None
     ):
         
         bsz, seqlen, _ = x.shape
@@ -110,7 +111,10 @@ class Attention(nn.Module):
         xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim).transpose(1, 2)
         xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
         xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
-        cos, sin = self.rotary_emb(xv,x)
+        if position_embedding is None:
+            cos, sin = self.rotary_emb(xv,x)
+        else:
+            cos, sin = position_embedding
         cos = cos.unsqueeze(1)
         sin = sin.unsqueeze(1)
         xq = (xq * cos) + (self.rotary_emb.rot(xq) * sin)
