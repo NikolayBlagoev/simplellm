@@ -135,11 +135,9 @@ class LLama(nn.Module):
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
 
-    def forward(self, x, targets, *args):
-        x = self.model(x,args)
-        shift_logits = x[..., :-1, :].contiguous()
-        shift_labels = targets[..., 1:].contiguous()
-        return self.lm_head()
+    def forward(self, x, *args):
+    
+        return self.lm_head(self.model(x,args))
 
     @torch.inference_mode()
     def generate(self, inp, tokenizer, max_gen_len: int, *args):
