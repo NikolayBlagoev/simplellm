@@ -54,7 +54,7 @@ class SkipSeq(nn.Sequential):
 
 class SwapSeq(nn.Sequential):
     def forward(self, *inputs):
-        x, start_p, mask, position_embeddings , order = inputs
+        x, start_p, mask, position_embeddings, order = inputs
 
         for v in order:
             if self._modules.get(v) == None:
@@ -133,9 +133,13 @@ class LLama(nn.Module):
         self.device = device
         self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,padding_idx,device,n_layers,ffn_dim_multiplier)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
+        # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
 
-    def forward(self, x, *args):
-        return self.lm_head(self.model(x,args))
+    def forward(self, x, targets, *args):
+        x = self.model(x,args)
+        shift_logits = x[..., :-1, :].contiguous()
+        shift_labels = targets[..., 1:].contiguous()
+        return self.lm_head()
 
     @torch.inference_mode()
     def generate(self, inp, tokenizer, max_gen_len: int, *args):
