@@ -4,10 +4,10 @@ from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 
-class Wikipedia_Dataset(IterableDataset):
+class Wikipedia_Dataset(object):
     
 
-    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train'):
+    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0):
         dataset = load_dataset("wikipedia", "20220301.en", split=split, streaming = streaming, trust_remote_code=True)
         
         iterable_dataset = dataset.shuffle(buffer_size=10_000)

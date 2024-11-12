@@ -1,4 +1,4 @@
-
+import torch.nn.functional as F
 def causalLLMLoss(x, target, vocab_size):
     
     shift_logits = x.float()[..., :-1, :].contiguous()

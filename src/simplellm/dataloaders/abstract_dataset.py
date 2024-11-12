@@ -6,14 +6,15 @@ from torch.utils.data import DataLoader, IterableDataset
 
 class AbstractDataset(IterableDataset):
     def __init__(self, dataset, tokenizer, seq_length=2048):
-        self.data = data
+        self.dataset = dataset
         self.tokenizer = tokenizer
         self.seq_length = seq_length
 
     def get_data(self):
         ret = [self.tokenizer.bos_id]
-        for txt in self.data:
-            ret += self.tokenizer(x['text'])
+        for txt in self.dataset:
+            
+            ret += txt['text']
             while len(ret) >= self.seq_length:
                 tmp = ret[:self.seq_length]
                 ret = [self.tokenizer.bos_id] + ret[self.seq_length:]
