@@ -187,11 +187,12 @@ class TransformerBlock(nn.Module):
         self,
         x: torch.Tensor,
         start_p = 0,
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
+        position_embedding = None
     ):
         
         h = x + self.self_attn.forward(
-            self.input_layernorm(x), start_p, mask
+            self.input_layernorm(x), start_p, mask, position_embedding=position_embedding
         )
         out = h + self.mlp.forward(self.post_attention_layernorm(h))
         return out

@@ -10,7 +10,7 @@ class LLamaSeq(nn.Sequential):
         for module in self._modules.values():
             if module.idx in to_skip:
                 continue
-            x = module(x, start_p, mask, )
+            x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
@@ -49,7 +49,7 @@ class SkipSeq(nn.Sequential):
         for module in self._modules.values():
             if module.idx in to_skip:
                 continue
-            x = module(x, start_p, mask)
+            x = module(x, start_p, mask, position_embeddings)
         return x
 
 
@@ -62,7 +62,7 @@ class SwapSeq(nn.Sequential):
                 continue
             module = self._modules[v]
             
-            x = module(x, start_p, mask)
+            x = module(x, start_p, mask, position_embeddings)
         return x
 
 class SkipLLama(nn.Module):
