@@ -30,7 +30,7 @@ class CausalLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
+        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, *args):
@@ -83,7 +83,7 @@ class SkipLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
+        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = []):
@@ -114,7 +114,7 @@ class SwapLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = LlamaRotaryEmbedding(dmodel//num_heads,device=device)
+        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, order = []):

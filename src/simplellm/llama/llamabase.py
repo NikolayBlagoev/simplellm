@@ -33,7 +33,7 @@ class RoPE(nn.Module):
         self.inv_freq = nn.Parameter(1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim)))
 
     @torch.no_grad()
-    def forward(self, x,init_input, position_ids = None):
+    def forward(self, x,init_input):
         
 
         # Core RoPE block
