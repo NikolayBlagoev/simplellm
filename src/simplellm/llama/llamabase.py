@@ -127,7 +127,7 @@ class Attention(nn.Module):
         if mask is not None:
             scores = scores + mask  # (bs, n_local_heads, seqlen, cache_len + seqlen)
         else:
-            scores = scores + self.mask[:, :, :seqlen, :seqlen]
+            scores = scores + self.mask[:, :, :seqlen, :seqlen].to(x.device)
         scores = F.softmax(scores.float(), dim=-1).type_as(xq)
         output = torch.matmul(scores, xv)  # (bs, n_local_heads, seqlen, head_dim)
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
