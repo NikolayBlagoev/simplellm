@@ -11,14 +11,18 @@ class AbstractDataset(IterableDataset):
         self.seq_length = seq_length
 
     def get_data(self):
-        ret = [self.tokenizer.bos_id]
+        
         for txt in self.dataset:
-            
+            ret = [self.tokenizer.bos_id]
+            trgt = []
             ret += txt['text']
-            while len(ret) >= self.seq_length:
-                tmp = ret[:self.seq_length]
-                ret = [self.tokenizer.bos_id] + ret[self.seq_length:]
-                yield torch.tensor(tmp)
+            trgt += txt['text']
+            while len(ret) >= self.seq_length + 1:
+                tmp_x = ret[:self.seq_length]
+                tmp_trgt = trgt[:self.seq_length]
+                ret =  ret[self.seq_length:]
+                trgt = trgt[self.seq_length:]
+                yield torch.tensor(tmp_x),torch.tensor(tmp_trgt)
 
     def get_stream(self):
         return cycle(self.get_data())
