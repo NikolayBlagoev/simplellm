@@ -60,7 +60,7 @@ def repeat_intrleave(x, n):
 
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, num_kv_heads = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda"):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
@@ -93,7 +93,9 @@ class Attention(nn.Module):
         
         
         self.rotary_emb = RoPE(dmodel//num_heads,device=device)
-        
+        mask = torch.full((1, 1, ctx_size, ctx_size), float("-inf"))
+        mask = torch.triu(mask, diagonal=1)
+        self.register_buffer("mask", mask)
         
 
     def forward(
@@ -124,6 +126,8 @@ class Attention(nn.Module):
         scores = torch.matmul(xq, xk.transpose(2, 3)) / math.sqrt(self.head_dim)
         if mask is not None:
             scores = scores + mask  # (bs, n_local_heads, seqlen, cache_len + seqlen)
+        else:
+            scores = scores + self.mask[:, :, :seqlen, :seqlen]
         scores = F.softmax(scores.float(), dim=-1).type_as(xq)
         output = torch.matmul(scores, xv)  # (bs, n_local_heads, seqlen, head_dim)
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
@@ -159,12 +163,12 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
-        self.self_attn = Attention(dmodel,num_heads,device=device)
+        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device)
         self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= 4 * dmodel,

@@ -22,6 +22,7 @@ class CausalLLama(nn.Module):
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
+                    ctx_size = ctx_size,
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
@@ -74,7 +75,7 @@ class SkipLLama(nn.Module):
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
-                    
+                    ctx_size = ctx_size,
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
@@ -105,7 +106,7 @@ class SwapLLama(nn.Module):
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
-                    
+                    ctx_size = ctx_size,
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
@@ -194,7 +195,7 @@ class LLamaStage(nn.Module):
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
-                    freq_cis=self.freqs_cis,
+                    ctx_size = ctx_size,
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
