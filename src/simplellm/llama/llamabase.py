@@ -149,10 +149,7 @@ class Attention(nn.Module):
         xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim).transpose(1, 2)
         xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
         xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
-        if position_embedding is None:
-            cos, sin = self.rotary_emb(xv,x)
-        else:
-            cos, sin = position_embedding
+        cos, sin = position_embedding
         xq, xk = apply_rotary_emb(xq, xk, cos, sin)
         xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
         xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
