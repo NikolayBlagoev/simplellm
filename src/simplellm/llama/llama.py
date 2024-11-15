@@ -30,8 +30,7 @@ class CausalLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
-        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
@@ -85,7 +84,7 @@ class SkipLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
+        freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
@@ -118,8 +117,7 @@ class SwapLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
-        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
