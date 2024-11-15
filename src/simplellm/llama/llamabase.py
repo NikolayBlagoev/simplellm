@@ -147,13 +147,16 @@ class Attention(nn.Module):
         
         xq, xk, xv = self.q_proj(x), self.k_proj(x), self.v_proj(x)
 
-        xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim).transpose(1, 2)
-        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
-        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim).transpose(1, 2)
+        xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim)
+        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
         cos, sin = position_embedding
         xq, xk = apply_rotary_emb(xq, xk, cos, sin)
         xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
         xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+        xq = xq.transpose(1, 2)
+        xk = xk.transpose(1, 2)
+        xv = xv.transpose(1, 2)
         scores = torch.nn.functional.scaled_dot_product_attention(
             xq,
             xk,
