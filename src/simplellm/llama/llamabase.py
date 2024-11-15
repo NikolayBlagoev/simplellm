@@ -166,7 +166,7 @@ class Attention(nn.Module):
             dropout_p= 0.0,
             is_causal=True,
         )
-        output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
+        output = scores.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
         return self.o_proj(output)
 
 
