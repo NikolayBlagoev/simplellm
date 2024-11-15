@@ -50,6 +50,44 @@ class RoPE(nn.Module):
         f = x[..., : x.shape[-1] // 2]
         s = x[..., x.shape[-1] // 2 :]
         return torch.cat((-s, f), dim=-1)
+
+def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
+    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
+    t = torch.arange(end, device=freqs.device)  # type: ignore
+    freqs = torch.outer(t, freqs).float()  # type: ignore
+    freqs_cos = torch.cos(freqs)  # real part
+    freqs_sin = torch.sin(freqs)  # imaginary part
+    return freqs_cos, freqs_sin
+
+def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
+    ndim = x.ndim
+    assert 0 <= 1 < ndim
+    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
+    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
+    return freqs_cis.view(shape)
+
+def apply_rotary_emb(
+    xq: torch.Tensor,
+    xk: torch.Tensor,
+    cos: torch.Tensor,
+    sin: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor]:
+
+
+    xq_r, xq_i = xq.float().reshape(xq.shape[:-1] + (-1, 2)).unbind(-1)
+    xk_r, xk_i = xk.float().reshape(xk.shape[:-1] + (-1, 2)).unbind(-1)
+
+    freqs_cos = reshape_for_broadcast(cos, xq_r)
+    freqs_sin = reshape_for_broadcast(sin, xq_r)
+    xq_out_r = xq_r * cos - xq_i * sin
+    xq_out_i = xq_r * sin + xq_i * cos
+    xk_out_r = xk_r * cos - xk_i * sin
+    xk_out_i = xk_r * sin + xk_i * cos
+
+    xq_out = torch.stack([xq_out_r, xq_out_i], dim=-1).flatten(3)
+    xk_out = torch.stack([xk_out_r, xk_out_i], dim=-1).flatten(3)
+
+    return xq_out.type_as(xq), xk_out.type_as(xk)
     
 def repeat_intrleave(x, n):
     if n == 1:
@@ -93,9 +131,7 @@ class Attention(nn.Module):
         
         
         self.rotary_emb = RoPE(dmodel//num_heads,device=device)
-        mask = torch.full((1, 1, ctx_size, ctx_size), float("-inf"))
-        mask = torch.triu(mask, diagonal=1)
-        self.register_buffer("mask", mask)
+        
         
 
     def forward(
@@ -117,10 +153,7 @@ class Attention(nn.Module):
             cos, sin = self.rotary_emb(xv,x)
         else:
             cos, sin = position_embedding
-        cos = cos.unsqueeze(1)
-        sin = sin.unsqueeze(1)
-        xq = (xq * cos) + (self.rotary_emb.rot(xq) * sin)
-        xk = (xk * cos) + (self.rotary_emb.rot(xk) * sin)
+        xq, xk = apply_rotary_emb(xq, xk, cos, sin)
         xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
         xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
         scores = torch.nn.functional.scaled_dot_product_attention(

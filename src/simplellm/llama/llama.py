@@ -30,12 +30,14 @@ class CausalLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
+        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
+        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, *args):
         _, seq_l = x.shape
-        position_embeddings = self.rotary_emb(x,x)
+        position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         h = self.embed_tokens(x)
         
         h = self.layers(h, start_p, mask, position_embeddings)
@@ -83,12 +85,14 @@ class SkipLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
+        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
+        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = []):
         _, seq_l = x.shape
-        position_embeddings = self.rotary_emb(x,x)
+        position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         h = self.embed_tokens(x)
         
         h = self.layers(h,start_p,mask,position_embeddings,to_skip)
@@ -114,13 +118,16 @@ class SwapLLama(nn.Module):
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = RoPE(dmodel//num_heads,device=device)
+        freqs_cos, freqs_sin = precompute_freqs_cis(self.params.dim // self.params.n_heads, self.params.max_seq_len)
+        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, order = []):
         _, seq_l = x.shape
         h = self.embed_tokens(x)
-        position_embeddings = self.rotary_emb(x,x)
+        position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
+        
         h = self.layers(h, start_p, mask, position_embeddings, order)
         h = self.norm(h)
        
@@ -135,7 +142,7 @@ class LLama(nn.Module):
         self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,padding_idx,device,n_layers,ffn_dim_multiplier)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
-
+        self.model.embed_tokens.weight = self.lm_head.weight
     def forward(self, x, *args):
     
         return self.lm_head(self.model(x,args))
