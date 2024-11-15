@@ -78,8 +78,8 @@ def apply_rotary_emb(
     xq_r, xq_i = xq.float().reshape(xq.shape[:-1] + (-1, 2)).unbind(-1)
     xk_r, xk_i = xk.float().reshape(xk.shape[:-1] + (-1, 2)).unbind(-1)
 
-    freqs_cos = reshape_for_broadcast(cos, xq_r)
-    freqs_sin = reshape_for_broadcast(sin, xq_r)
+    cos = reshape_for_broadcast(cos, xq_r)
+    sin = reshape_for_broadcast(sin, xq_r)
     xq_out_r = xq_r * cos - xq_i * sin
     xq_out_i = xq_r * sin + xq_i * cos
     xk_out_r = xk_r * cos - xk_i * sin
