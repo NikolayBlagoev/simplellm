@@ -123,13 +123,14 @@ class Attention(nn.Module):
         xk = (xk * cos) + (self.rotary_emb.rot(xk) * sin)
         xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
         xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
-        scores = torch.matmul(xq, xk.transpose(2, 3)) / math.sqrt(self.head_dim)
-        if mask is not None:
-            scores = scores + mask  # (bs, n_local_heads, seqlen, cache_len + seqlen)
-        else:
-            scores = scores + self.mask[:, :, :seqlen, :seqlen].to(x.device)
-        scores = F.softmax(scores.float(), dim=-1).type_as(xq)
-        output = torch.matmul(scores, xv)  # (bs, n_local_heads, seqlen, head_dim)
+        scores = torch.nn.functional.scaled_dot_product_attention(
+            xq,
+            xk,
+            xv,
+            attn_mask=None,
+            dropout_p= 0.0,
+            is_causal=True,
+        )
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
         return self.o_proj(output)
 
