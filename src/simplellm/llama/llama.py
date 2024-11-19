@@ -105,9 +105,9 @@ class SwapLLama(nn.Module):
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
-        self.layers = SwapSeq(
-            [
-                TransformerBlock(
+        self.layers = SwapSeq()
+        for i in range(n_layers):
+            self.layers.append(TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
@@ -116,8 +116,8 @@ class SwapLLama(nn.Module):
                     ffn_dim_multiplier=ffn_dim_multiplier, 
                     idx = i,
                     device = device
-                ) for i in range(n_layers)
-            ])
+                ))
+            
         freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
