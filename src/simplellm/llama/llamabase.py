@@ -181,6 +181,7 @@ class FeedForward(nn.Module):
     ):
         
         super().__init__()
+        hidden_dim = 4 * hidden_dim
         hidden_dim = int(2 * hidden_dim / 3)
         # custom dim factor multiplier
         if ffn_dim_multiplier is not None:
@@ -207,7 +208,7 @@ class TransformerBlock(nn.Module):
         self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device)
         self.mlp = FeedForward(
             dim=dmodel,
-            hidden_dim= 4 * dmodel,
+            hidden_dim= dmodel,
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
             device=device
@@ -226,7 +227,7 @@ class TransformerBlock(nn.Module):
         mask: Optional[torch.Tensor] = None,
         position_embedding = None
     ):
-        
+        print(self.idx)
         h = x + self.self_attn.forward(
             self.input_layernorm(x), start_p, mask, position_embedding=position_embedding
         )

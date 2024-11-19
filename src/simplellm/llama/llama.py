@@ -18,7 +18,7 @@ class CausalLLama(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = LLamaSeq(
-            *[
+            [
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
@@ -73,7 +73,7 @@ class SkipLLama(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = SkipSeq(
-            *[
+            [
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
@@ -106,7 +106,7 @@ class SwapLLama(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = SwapSeq(
-            *[
+            [
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
