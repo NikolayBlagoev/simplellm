@@ -58,11 +58,10 @@ class SkipSeq(nn.Sequential):
 class SwapSeq(nn.Sequential):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings, order = inputs
-
+        #print(order)
         for v in order:
-            if self._modules.get(v) == None:
-                continue
-            module = self._modules[v]
+            #print(v)
+            module = self._modules[str(v)]
             
             x = module(x, start_p, mask, position_embeddings)
         return x
@@ -107,7 +106,8 @@ class SwapLLama(nn.Module):
         
         self.layers = SwapSeq()
         for i in range(n_layers):
-            self.layers.append(TransformerBlock(
+            self.layers.add_module(str(i),TransformerBlock(
+
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
@@ -119,6 +119,8 @@ class SwapLLama(nn.Module):
                 ))
             
         freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
+        freqs_cos = freqs_cos.to(device)
+        freqs_sin = freqs_sin.to(device)
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
@@ -144,8 +146,8 @@ class LLama(nn.Module):
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         self.model.embed_tokens.weight = self.lm_head.weight
     def forward(self, x, *args):
-    
-        return self.lm_head(self.model(x,args))
+        #print(*args) 
+        return self.lm_head(self.model(x,*args))
 
     @torch.inference_mode()
     def generate(self, inp, tokenizer, max_gen_len: int, *args):

@@ -227,7 +227,7 @@ class TransformerBlock(nn.Module):
         mask: Optional[torch.Tensor] = None,
         position_embedding = None
     ):
-        print(self.idx)
+        #print(self.idx)
         h = x + self.self_attn.forward(
             self.input_layernorm(x), start_p, mask, position_embedding=position_embedding
         )
