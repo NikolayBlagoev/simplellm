@@ -3,7 +3,7 @@ import torch
 from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
-
+from .abstract_dataset import AbstractDataset
 class Wikipedia_Dataset(object):
     
 
@@ -11,7 +11,7 @@ class Wikipedia_Dataset(object):
         dataset = load_dataset("wikipedia", "20220301.en", split=split, streaming = streaming, trust_remote_code=True)
         
         iterable_dataset = dataset.shuffle(buffer_size=10_000)
-
+        iterable_dataset = iterable_dataset.map(self.tokenization, batched=True, batch_size=batch_size)
         self.batch_size = batch_size
         self.iterable_dataset = AbstractDataset(iterable_dataset, tokenizer, seq_l)
 
@@ -19,7 +19,8 @@ class Wikipedia_Dataset(object):
         self.tokenizer = tokenizer
         self.seq_l = seq_l
         print("WIKIPEDIA DATASET LOADED...")
-    
+    def tokenization(self, t):
+        return {"text": self.tokenizer.encode(t["text"])}
     def get_data(self):
         return self.dl
     

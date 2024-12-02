@@ -35,7 +35,7 @@ class CausalLLama(nn.Module):
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x, start_p = 0, mask = None, position_ids = None, *args):
+    def forward(self, x, start_p = 0, mask = None, position_ids = None, **kwargs):
         _, seq_l = x.shape
         position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         h = self.embed_tokens(x)
@@ -89,7 +89,7 @@ class SkipLLama(nn.Module):
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = []):
+    def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = [], **kwargs):
         _, seq_l = x.shape
         position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         h = self.embed_tokens(x)
@@ -104,10 +104,9 @@ class SwapLLama(nn.Module):
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
-        self.layers = SwapSeq()
-        for i in range(n_layers):
-            self.layers.add_module(str(i),TransformerBlock(
-
+        self.layers = SwapSeq(
+            *[
+                TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
@@ -116,7 +115,10 @@ class SwapLLama(nn.Module):
                     ffn_dim_multiplier=ffn_dim_multiplier, 
                     idx = i,
                     device = device
-                ))
+                ) for i in range(n_layers)
+            ]
+        )
+        
             
         freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
         freqs_cos = freqs_cos.to(device)
@@ -125,7 +127,7 @@ class SwapLLama(nn.Module):
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
-    def forward(self, x, start_p = 0, mask = None, position_ids = None, order = []):
+    def forward(self, x, start_p = 0, mask = None, position_ids = None, order = [], **kwargs):
         _, seq_l = x.shape
         h = self.embed_tokens(x)
         position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
@@ -145,9 +147,9 @@ class LLama(nn.Module):
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         self.model.embed_tokens.weight = self.lm_head.weight
-    def forward(self, x, *args):
+    def forward(self, x, **kwargs):
         #print(*args) 
-        return self.lm_head(self.model(x,*args))
+        return self.lm_head(self.model(x,**kwargs))
 
     @torch.inference_mode()
     def generate(self, inp, tokenizer, max_gen_len: int, *args):
