@@ -197,11 +197,11 @@ class LLama(nn.Module):
     
 
 class LLamaStage(nn.Module):
-    def __init__(self, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, device = "cuda") -> None:
+    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, padding_idx = None, device = "cuda", ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.transformers = []
-        self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = nn.Sequential(
+        
+        self.transformers = SkipSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
@@ -216,21 +216,17 @@ class LLamaStage(nn.Module):
             ]
         
         )
+        freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
+        freqs_cos = freqs_cos.to(device)
+        freqs_sin = freqs_sin.to(device)
+        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         
     def forward(self, x, start_p = 0):
-        mask = None
-        
         _, seq_l, _ = x.shape
-        if seq_l > 1:
-            mask = torch.full(
-                (seq_l, seq_l), float("-inf"), device=x.device
-            )
-
-            mask = torch.triu(mask, diagonal=1)
-            mask = torch.hstack([
-                torch.zeros((seq_l, start_p), device=x.device),
-                mask
-            ]).type_as(x)
+        position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
+        
+        h = self.layers(x,start_p,None,position_embeddings,[])
         
         return self.transformers(x)
 
@@ -238,38 +234,13 @@ class LLamaFirstStage(nn.Module):
     def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda") -> None:
         super().__init__()
         self.embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
-        self.freqs_cis = precompute_freqs_cis(dmodel // num_heads, ctx_size * 2).to(device)
-        self.transformers = nn.Sequential(
-            *[
-                TransformerBlock(
-                    dmodel=dmodel,
-                    num_heads=num_heads,
-                    freq_cis=self.freqs_cis,
-                    multiple_of=multiple_of,
-                    norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
-                    idx = i,
-                    device = device
-                ) for i in range(n_layers)
-            ]
+        self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         
-        )
+        self.embedding.weight = self.lm_head.weight
         
-        
-    def forward(self, x, start_p = 0):
-        _, seq_l = x.shape
-        x = self.embedding(x)
-        mask = None
-        if seq_l > 1:
-            mask = torch.full(
-                (seq_l, seq_l), float("-inf"), device=x.device
-            )
-
-            mask = torch.triu(mask, diagonal=1)
-            mask = torch.hstack([
-                torch.zeros((seq_l, start_p), device=x.device),
-                mask
-            ]).type_as(x)
-        
-        
-        return self.transformers(x)
+    def embed(self, x):
+        return self.embedding(x)
+    def forward_end(self, x):
+       
+        return  self.lm_head(self.norm(x))
