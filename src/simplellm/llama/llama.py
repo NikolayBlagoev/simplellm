@@ -228,7 +228,7 @@ class LLamaStage(nn.Module):
         
         h = self.layers(x,start_p,None,position_embeddings,[])
         
-        return self.transformers(x)
+        return h
 
 class LLamaFirstStage(nn.Module):
     def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda") -> None:
