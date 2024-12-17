@@ -199,9 +199,9 @@ class LLama(nn.Module):
 class LLamaStage(nn.Module):
     def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, padding_idx = None, device = "cuda", ffn_dim_multiplier = None) -> None:
         super().__init__()
-        self.transformers = []
         
-        self.transformers = SkipSeq(
+        
+        self.layers = SkipSeq(
             *[
                 TransformerBlock(
                     dmodel=dmodel,
