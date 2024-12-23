@@ -85,6 +85,8 @@ class SkipLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
+        freqs_cos = freqs_cos.to(device)
+        freqs_sin = freqs_sin.to(device)
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
