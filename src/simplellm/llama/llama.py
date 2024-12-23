@@ -72,7 +72,7 @@ class SkipLLama(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = SkipSeq(
-            [
+            *[
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
