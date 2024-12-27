@@ -240,9 +240,35 @@ class LLamaFirstStage(nn.Module):
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         
         self.embedding.weight = self.lm_head.weight
+        self.layers = SkipSeq(
+            *[
+                TransformerBlock(
+                    dmodel=dmodel,
+                    num_heads=num_heads,
+                    ctx_size = ctx_size,
+                    multiple_of=multiple_of,
+                    norm_eps=norm_eps,
+                    ffn_dim_multiplier=ffn_dim_multiplier, 
+                    idx = i,
+                    device = device
+                ) for i in range(n_layers)
+            ]
+        
+        )
+        freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
+        freqs_cos = freqs_cos.to(device)
+        freqs_sin = freqs_sin.to(device)
+        self.register_buffer("freqs_cos", freqs_cos, persistent=False)
+        self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         
     def embed(self, x):
-        return self.embedding(x)
+        x = self.embedding(x)
+        _, seq_l, _ = x.shape
+        position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
+        
+        h = self.layers(x,start_p,None,position_embeddings,[])
+        
+        return h
     def forward_end(self, x):
        
         return  self.lm_head(self.norm(x))
