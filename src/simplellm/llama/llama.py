@@ -266,7 +266,7 @@ class LLamaFirstStage(nn.Module):
         _, seq_l, _ = x.shape
         position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         
-        h = self.layers(x,start_p,None,position_embeddings,[])
+        h = self.layers(x,0,None,position_embeddings,[])
         
         return h
     def forward_end(self, x):
