@@ -2,6 +2,7 @@ from torch.nn import Module, Parameter, Linear
 from torch.nn import functional as F, init
 from torch import tensor, matmul, Tensor
 import torch
+import math
 from torch.cuda.amp import custom_bwd, custom_fwd
 class CustomLinear(Module):
     __constants__ = ["in_features", "out_features"]
