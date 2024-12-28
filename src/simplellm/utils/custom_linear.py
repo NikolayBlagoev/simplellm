@@ -82,20 +82,20 @@ class LinearWithGradAccumulation(torch.autograd.Function):
         return output
     @staticmethod
     def delayed_weight_update(weight: Parameter, bias: Parameter, grad_output: Tensor, input: Tensor):
-        w_grad = grad_output.T @ input
+        w_grad = grad_output.mT @ input
 
         if weight.grad == None:
-            weight.grad = w_grad
+            weight.grad = torch.mean(w_grad,axis = 0)
         else:
-            weight.grad += w_grad
+            weight.grad += torch.mean(w_grad,axis = 0)
 
 
         if bias is not None:
             b_grad = grad_output.sum(axis=0)
             if bias.grad == None:
-                bias.grad = b_grad
+                bias.grad = torch.mean(w_grad,axis = 0)
             else:
-                bias.grad += b_grad
+                bias.grad += torch.mean(w_grad,axis = 0)
 
         
         
