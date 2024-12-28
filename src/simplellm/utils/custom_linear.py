@@ -1,6 +1,7 @@
 from torch.nn import Module, Parameter, Linear
 from torch.nn import functional as F, init
 from torch import tensor, matmul, Tensor
+import torch
 from torch.cuda.amp import custom_bwd, custom_fwd
 class CustomLinear(Module):
     __constants__ = ["in_features", "out_features"]
@@ -40,7 +41,7 @@ class CustomLinear(Module):
     def forward(self, input: Tensor) -> Tensor:
         
         return LinearWithGradAccumulation.apply(input,self.weight,self.bias)
-        
+
     def extra_repr(self) -> str:
         return f"in_features={self.in_features}, out_features={self.out_features}, bias={self.bias is not None}"
 class WeightStore:
