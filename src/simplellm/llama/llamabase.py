@@ -4,7 +4,7 @@ from typing import Literal, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
-
+from ..utils import *
 
 
 
@@ -100,31 +100,37 @@ def repeat_intrleave(x, n):
 
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda", linear_implementation = "torch"):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
         self.head_dim = dmodel // num_heads
         self.num_heads = num_heads
-        self.q_proj = nn.Linear(
+        if linear_implementation == "torch":
+            linear_implementation = nn.Linear
+        elif linear_implementation == "delayed":
+            linear_implementation = CustomLinear
+        else:
+            raise AttributeError(f"UNKNOWN IMPLEMENTATION {linear_implementation}")
+        self.q_proj = linear_implementation(
             dmodel,
             num_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.k_proj = nn.Linear(
+        self.k_proj = linear_implementation(
             dmodel,
             self.n_kv_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.v_proj = nn.Linear(
+        self.v_proj = linear_implementation(
             dmodel,
             self.n_kv_heads * self.head_dim,
             bias=False,
             device=device
         )
-        self.o_proj = nn.Linear(
+        self.o_proj = linear_implementation(
             num_heads * self.head_dim,
             dmodel,
             bias=False,
@@ -177,7 +183,8 @@ class FeedForward(nn.Module):
         hidden_dim: int,
         multiple_of: int,
         ffn_dim_multiplier: Optional[float],
-        device = "cuda"
+        device = "cuda",
+        linear_implementation = "torch"
     ):
         
         super().__init__()
@@ -187,12 +194,17 @@ class FeedForward(nn.Module):
         if ffn_dim_multiplier is not None:
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
         hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
-
-        self.gate_proj = nn.Linear(
+        if linear_implementation == "torch":
+            linear_implementation = nn.Linear
+        elif linear_implementation == "delayed":
+            linear_implementation = CustomLinear
+        else:
+            raise AttributeError(f"UNKNOWN IMPLEMENTATION {linear_implementation}")
+        self.gate_proj = linear_implementation(
             dim, hidden_dim, bias=False,device=device)
-        self.down_proj = nn.Linear(
+        self.down_proj =  linear_implementation(
             hidden_dim, dim, bias=False,device=device)
-        self.up_proj = nn.Linear(
+        self.up_proj = linear_implementation(
             dim, hidden_dim, bias=False,device=device)
 
     def forward(self, x):
@@ -200,18 +212,19 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda"):
+    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
-        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device)
+        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation)
         self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= dmodel,
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
-            device=device
+            device=device,
+            linear_implementation=linear_implementation
         )
         if idx == None:
             raise ValueError("Index cannot be none!")

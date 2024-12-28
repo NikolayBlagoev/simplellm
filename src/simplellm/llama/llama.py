@@ -199,7 +199,7 @@ class LLama(nn.Module):
     
 
 class LLamaStage(nn.Module):
-    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, padding_idx = None, device = "cuda", ffn_dim_multiplier = None) -> None:
+    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch") -> None:
         super().__init__()
         
         
@@ -213,7 +213,8 @@ class LLamaStage(nn.Module):
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
                     idx = i,
-                    device = device
+                    device = device,
+                    linear_implementation = linear_implementation
                 ) for i in range(n_layers)
             ]
         
@@ -233,7 +234,7 @@ class LLamaStage(nn.Module):
         return h
 
 class LLamaFirstStage(nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda") -> None:
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda", linear_implementation = "torch") -> None:
         super().__init__()
         self.embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
@@ -250,7 +251,8 @@ class LLamaFirstStage(nn.Module):
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
                     idx = i,
-                    device = device
+                    device = device,
+                    linear_implementation = linear_implementation
                 ) for i in range(n_layers)
             ]
         
