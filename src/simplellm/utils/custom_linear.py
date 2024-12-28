@@ -105,4 +105,5 @@ class LinearWithGradAccumulation(torch.autograd.Function):
         input, weight, bias = ctx.saved_tensors
         use_bias = ctx.use_bias
         grad_input = grad_output @ weight.data
+        WeightStore.put(LinearWithGradAccumulation.delayed_weight_update,weight,bias,grad_output,input)
         return grad_input, None, None
