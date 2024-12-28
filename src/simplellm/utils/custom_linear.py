@@ -74,7 +74,7 @@ class LinearWithGradAccumulation(torch.autograd.Function):
         ctx.save_for_backward(input, weight, bias)
         ctx.use_bias = bias is not None
 
-        output = matmul(total_input.data, weight.t())
+        output = matmul(input.data, weight.t())
         if bias is not None:
             output = output + bias.data
 
