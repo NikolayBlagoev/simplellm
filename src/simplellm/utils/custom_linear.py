@@ -82,6 +82,8 @@ class LinearWithGradAccumulation(torch.autograd.Function):
         return output
     @staticmethod
     def delayed_weight_update(weight: Parameter, bias: Parameter, grad_output: Tensor, input: Tensor):
+        grad_output = grad_output.to(weight.device)
+        input = input.to(weight.device)
         w_grad = grad_output.mT @ input
 
         if weight.grad == None:
@@ -96,7 +98,9 @@ class LinearWithGradAccumulation(torch.autograd.Function):
                 bias.grad = torch.mean(w_grad,axis = 0)
             else:
                 bias.grad += torch.mean(w_grad,axis = 0)
-
+            del b_grad
+        del w_grad
+        torch.cuda.empty_cache()
         
         
         
@@ -105,5 +109,5 @@ class LinearWithGradAccumulation(torch.autograd.Function):
         input, weight, bias = ctx.saved_tensors
         use_bias = ctx.use_bias
         grad_input = grad_output @ weight.data
-        WeightStore.put(LinearWithGradAccumulation.delayed_weight_update,weight,bias,grad_output,input)
+        WeightStore.put(LinearWithGradAccumulation.delayed_weight_update,weight,bias,grad_output.to("cpu"),input.to("cpu"))
         return grad_input, None, None
