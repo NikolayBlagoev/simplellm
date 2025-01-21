@@ -144,11 +144,11 @@ class SwapLLama(nn.Module):
 
     
 class LLama(nn.Module):
-    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None):
+    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None):
         super().__init__()
         self.max_seq = ctx_size
         self.device = device
-        self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,padding_idx,device,n_layers,ffn_dim_multiplier)
+        self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,n_layers,ffn_dim_multiplier)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         self.model.embed_tokens.weight = self.lm_head.weight
