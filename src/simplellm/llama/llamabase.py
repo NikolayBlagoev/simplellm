@@ -188,12 +188,12 @@ class FeedForward(nn.Module):
     ):
         
         super().__init__()
-        hidden_dim = 4 * hidden_dim
-        hidden_dim = int(2 * hidden_dim / 3)
+        hidden_dim = 4 * dim
+        
         # custom dim factor multiplier
         if ffn_dim_multiplier is not None:
             hidden_dim = int(ffn_dim_multiplier * hidden_dim)
-        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+       
         if linear_implementation == "torch":
             linear_implementation = nn.Linear
         elif linear_implementation == "delayed":

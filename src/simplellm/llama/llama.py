@@ -8,8 +8,6 @@ class LLamaSeq(nn.Sequential):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings = inputs
         for module in self._modules.values():
-            if module.idx in to_skip:
-                continue
             x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(nn.Module):
@@ -18,7 +16,7 @@ class CausalLLama(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = LLamaSeq(
-            [
+            *[
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
@@ -31,6 +29,8 @@ class CausalLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         freqs_cos, freqs_sin = precompute_freqs_cis(dmodel // num_heads, ctx_size)
+        freqs_cos = freqs_cos.to(device)
+        freqs_sin = freqs_sin.to(device)
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
