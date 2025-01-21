@@ -212,12 +212,12 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, idx = None, device = "cuda", linear_implementation = "torch"):
+    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
         self.head_dim = dmodel // num_heads
-        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation)
+        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation,num_kv_heads=num_kv_heads)
         self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= dmodel,

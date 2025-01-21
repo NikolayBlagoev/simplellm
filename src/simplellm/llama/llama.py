@@ -11,7 +11,7 @@ class LLamaSeq(nn.Sequential):
             x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -24,6 +24,7 @@ class CausalLLama(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device
                 ) for i in range(n_layers)
@@ -67,7 +68,7 @@ class SwapSeq(nn.Sequential):
         return x
 
 class SkipLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -80,6 +81,7 @@ class SkipLLama(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device
                 ) for i in range(n_layers)
@@ -102,7 +104,7 @@ class SkipLLama(nn.Module):
 
 
 class SwapLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -115,6 +117,7 @@ class SwapLLama(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads=num_kv_heads,
                     idx = i,
                     device = device
                 ) for i in range(n_layers)
@@ -199,7 +202,7 @@ class LLama(nn.Module):
     
 
 class LLamaStage(nn.Module):
-    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch") -> None:
+    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch") -> None:
         super().__init__()
         
         
@@ -212,6 +215,7 @@ class LLamaStage(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device,
                     linear_implementation = linear_implementation
@@ -234,13 +238,13 @@ class LLamaStage(nn.Module):
         return h
 
 class LLamaFirstStage(nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda", linear_implementation = "torch") -> None:
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch") -> None:
         super().__init__()
-        self.embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
+        self._embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         
-        self.embedding.weight = self.lm_head.weight
+        self._embedding.weight = self.lm_head.weight
         self.layers = SkipSeq(
             *[
                 TransformerBlock(
@@ -250,6 +254,7 @@ class LLamaFirstStage(nn.Module):
                     multiple_of=multiple_of,
                     norm_eps=norm_eps,
                     ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device,
                     linear_implementation = linear_implementation
@@ -264,7 +269,7 @@ class LLamaFirstStage(nn.Module):
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
         
     def embed(self, x):
-        x = self.embedding(x)
+        x = self._embedding(x)
         _, seq_l, _ = x.shape
         position_embeddings = (self.freqs_cos[:seq_l], self.freqs_sin[:seq_l])
         
