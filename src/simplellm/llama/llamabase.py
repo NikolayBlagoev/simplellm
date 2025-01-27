@@ -8,7 +8,7 @@ from ..utils import *
 
 
 
-
+# CORRECT
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6, device = "cuda"):
         
@@ -25,6 +25,7 @@ class RMSNorm(torch.nn.Module):
         output = self._norm(x.float()).type_as(x)
         
         return output * self.weight
+# TODO:
 class RoPE(nn.Module):
     def __init__(self, dim, theta=10000, device="cuda"):
         super().__init__()
@@ -97,15 +98,17 @@ def repeat_intrleave(x, n):
     b, num_kv, seq_len, head_dim = x.shape
     x = x[:, :, None, :, :].expand(b, num_kv, n, seq_len, head_dim)
     return x.reshape(b, num_kv * n, seq_len, head_dim)
-
+# TODO
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda", linear_implementation = "torch"):
+    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda", linear_implementation = "torch", drop_out_p = 0.0):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
         self.head_dim = dmodel // num_heads
         self.num_heads = num_heads
+        self.drop_out_p = drop_out_p
+        self.scaling = self.head_dim**-0.5
         if linear_implementation == "torch":
             linear_implementation = nn.Linear
         elif linear_implementation == "delayed":
@@ -157,23 +160,30 @@ class Attention(nn.Module):
         xq = xq.view(bsz, seqlen, self.num_heads, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
         xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
-        cos, sin = position_embedding
-        xq, xk = apply_rotary_emb(xq, xk, cos, sin)
-        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
-        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
         xq = xq.transpose(1, 2)
         xk = xk.transpose(1, 2)
         xv = xv.transpose(1, 2)
-        scores = torch.nn.functional.scaled_dot_product_attention(
+        cos, sin = position_embedding
+
+        xq, xk = apply_rotary_emb(xq, xk, cos, sin)
+        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
+        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+        xq = xq.contiguous()
+        xv = xv.contiguous()
+        xk = xk.contiguous()
+        o, _ = torch.nn.functional.scaled_dot_product_attention(
             xq,
             xk,
             xv,
             attn_mask=None,
-            dropout_p= 0.0,
+            dropout_p=self.drop_out_p,
             is_causal=True,
+            scaling=self.scaling
         )
-        output = scores.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
-        return self.o_proj(output)
+        o = o.reshape(bsz, seqlen, -1).contiguous()
+        o = self.o_proj(o)
+        
+        return o
 
 
 class FeedForward(nn.Module):
@@ -210,7 +220,7 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
-
+# CHECKED
 class TransformerBlock(nn.Module):
     def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
