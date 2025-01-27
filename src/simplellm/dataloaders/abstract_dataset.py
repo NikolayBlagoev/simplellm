@@ -12,7 +12,7 @@ class AbstractDataset(IterableDataset):
 
     def get_data(self):
         tmp = []
-        
+        # print(self.dataset)
         for txt in self.dataset:
             
             tmp += [self.tokenizer.bos_id] + txt['text']

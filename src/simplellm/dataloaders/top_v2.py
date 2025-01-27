@@ -20,7 +20,10 @@ class TopV2(object):
         self.seq_l = seq_l
         print(f".... DATASET LOADED...")
     def tokenization(self, t):
-        return {"text": self.tokenizer.encode(t["utterance"] + t["semantic_parse"]) + [-1]}
+        # print(t["utterance"])
+        # print(t["semantic_parse"])
+        # print(t["utterance"] + t["semantic_parse"])
+        return {"text": self.tokenizer.encode([t["utterance"][0] + t["semantic_parse"][0]])}
     def get_data(self):
         return self.dl
     
