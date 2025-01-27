@@ -22,7 +22,7 @@ class TopV2(object):
     def tokenization(self, t):
         # print(t["utterance"])
         # print(t["semantic_parse"])
-        # print(t["utterance"] + t["semantic_parse"])
+        # print(t["utterance"][0] + t["semantic_parse"][0])
         return {"text": self.tokenizer.encode([t["utterance"][0] + t["semantic_parse"][0]])}
     def get_data(self):
         return self.dl
