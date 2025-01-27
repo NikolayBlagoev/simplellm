@@ -4,7 +4,7 @@ from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 from .abstract_dataset import AbstractDataset
-class RedPyjama(object):
+class TopV2(object):
     
 
     def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0):
