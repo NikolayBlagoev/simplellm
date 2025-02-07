@@ -3,12 +3,13 @@ import torch
 from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from .abstract_dataset import AbstractDataset
+from ..utils import State
 class TinyStories(object):
     
 
-    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train', num_workers = 0):
+    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train', num_workers = 0,skip = 0):
         dataset = load_dataset("roneneldan/TinyStories", split=split, streaming = streaming, trust_remote_code=True)
-        iterable_dataset = dataset.shuffle(buffer_size=10_000)
+        iterable_dataset = dataset.shuffle(buffer_size=10_000, seed=State.get_seed()).skip(skip)
         iterable_dataset = iterable_dataset.map(self.tokenization, batched=True, batch_size=batch_size)
         self.batch_size = batch_size
         self.iterable_dataset = AbstractDataset(iterable_dataset, tokenizer, seq_l)

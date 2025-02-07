@@ -4,13 +4,14 @@ from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 from .abstract_dataset import AbstractDataset
+from ..utils import State
 class TopV2(object):
     
 
-    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0):
+    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0, skip = 0):
         dataset = load_dataset("WillHeld/top_v2", split=split,streaming = streaming, trust_remote_code=True)
         
-        iterable_dataset = dataset.shuffle(buffer_size=10_000)
+        iterable_dataset = dataset.shuffle(buffer_size=10_000, seed=State.get_seed()).skip(skip)
         iterable_dataset = iterable_dataset.map(self.tokenization, batched=True, batch_size=batch_size)
         self.batch_size = batch_size
         self.iterable_dataset = AbstractDataset(iterable_dataset, tokenizer, seq_l)
@@ -20,9 +21,7 @@ class TopV2(object):
         self.seq_l = seq_l
         print(f".... DATASET LOADED...")
     def tokenization(self, t):
-        # print(t["utterance"])
-        # print(t["semantic_parse"])
-        # print(t["utterance"][0] + t["semantic_parse"][0])
+        
         return {"text": self.tokenizer.encode([t["utterance"][0] + t["semantic_parse"][0]])}
     def get_data(self):
         return self.dl
