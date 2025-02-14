@@ -1,5 +1,4 @@
 datasets
 sentencepiece
 torch
-transformers
 requests

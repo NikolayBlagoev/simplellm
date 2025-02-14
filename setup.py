@@ -13,7 +13,8 @@ setup(
     license='MIT License',
     install_requires=['datasets',
                       'torch',
-                      'sentencepiece'                     
+                      'sentencepiece',
+                      'requests'                     
                       ],
     classifiers=["Programming Language :: Python :: 3",
                 "License :: OSI Approved :: MIT License",
