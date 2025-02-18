@@ -86,7 +86,8 @@ class EnsembleLLama(nn.Module):
     def forward(self, x, stop_at = None, **kwargs):
         #print(*args) 
         x, position_embeddings = self.model_pre(x)
-        
+        if stop_at == 0:
+            return self.lm_head(x)
         res = []
         for i,d in enumerate(self.ensembles):
             if stop_at != None and i == stop_at:
