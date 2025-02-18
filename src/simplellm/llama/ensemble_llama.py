@@ -89,6 +89,8 @@ class EnsembleLLama(nn.Module):
         
         res = []
         for i,d in enumerate(self.ensembles):
+            if len(self.ensembles) > 1 and i == len(self.ensembles) - 1:
+                continue
             res.append(d(x).unsqueeze(0))
         x = torch.cat(res)
         x = torch.mean(x,dim=0)
