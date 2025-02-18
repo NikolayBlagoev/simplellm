@@ -13,7 +13,7 @@ def perplexityLoss(logits,target, attention_mask = None):
     ls = CrossEntropyLoss(reduction="none")
     ls = ls(shift_logits.transpose(1, 2), shift_target)
     ls = ls.sum(1) / shift_mask.sum(1)
-    ls = exp(ls).tolist()
+    ls = exp(ls)
     return mean(ls)
 
 def perplexityLoss2(logits,target, attention_mask = None):
@@ -31,6 +31,6 @@ def perplexityLoss2(logits,target, attention_mask = None):
     negative_log_likelihood = -shift_target.sum(-1) / shift_mask.sum(-1)
 
     perplexities = exp(negative_log_likelihood)
-    perplexities = perplexities.tolist()
+    
 
     return mean(perplexities)
