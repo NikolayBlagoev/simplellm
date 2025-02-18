@@ -83,13 +83,13 @@ class EnsembleLLama(nn.Module):
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         if shared:
             self.model.embed_tokens.weight = self.lm_head.weight
-    def forward(self, x, **kwargs):
+    def forward(self, x, skip_last = False, **kwargs):
         #print(*args) 
         x, position_embeddings = self.model_pre(x)
         
         res = []
         for i,d in enumerate(self.ensembles):
-            if len(self.ensembles) > 1 and i == len(self.ensembles) - 1:
+            if skip_last and len(self.ensembles) > 1 and i == len(self.ensembles) - 1:
                 continue
             res.append(d(x).unsqueeze(0))
         x = torch.cat(res)
