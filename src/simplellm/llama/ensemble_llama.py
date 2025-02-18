@@ -75,7 +75,7 @@ class EnsembleLLama(nn.Module):
         self.max_seq = ctx_size
         self.device = device
         self.model_pre = _CausalLLama(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,n_layers,ffn_dim_multiplier)
-        self.ensembles = [
+        self.ensembles =[
             TreeLLama(vocab_size,dmodel,num_heads//ensembles,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,ensemble_layers,ffn_dim_multiplier)
             for _ in range(ensembles)
         ]
@@ -90,6 +90,7 @@ class EnsembleLLama(nn.Module):
         res = []
         for i,d in enumerate(self.ensembles):
             if stop_at != None and i == stop_at:
+                print("stopping at ",i)
                 break
             res.append(d(x).unsqueeze(0))
         x = torch.cat(res)
