@@ -30,7 +30,7 @@ class _CausalLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
-        self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, **kwargs):
         B, seq_l = x.shape
@@ -38,7 +38,7 @@ class _CausalLLama(nn.Module):
         h = self.embed_tokens(x)
         position_embeddings = self.rotary_emb(h,B,seq_l)
         h = self.layers(h, start_p, mask, position_embeddings)
-        h = self.norm(h)
+        
         return h, position_embeddings
 
 class TreeLLama(nn.Module):
@@ -60,13 +60,13 @@ class TreeLLama(nn.Module):
                 ) for i in range(n_layers)
             ])
         self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
-        self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
+        
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, **kwargs):
         B, seq_l,_ = x.shape
         position_embeddings = self.rotary_emb(x,B,seq_l)
         h = self.layers(x, start_p, mask, position_embeddings)
-        h = self.norm(h)
+        
         return h
     
 class EnsembleLLama(nn.Module):
@@ -75,10 +75,11 @@ class EnsembleLLama(nn.Module):
         self.max_seq = ctx_size
         self.device = device
         self.model_pre = _CausalLLama(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,n_layers,ffn_dim_multiplier)
-        self.ensembles =[
+        self.ensembles = nn.ModuleList([
             TreeLLama(vocab_size,dmodel,num_heads//ensembles,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,ensemble_layers,ffn_dim_multiplier)
             for _ in range(ensembles)
-        ]
+        ])
+        self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         if shared:
@@ -96,7 +97,7 @@ class EnsembleLLama(nn.Module):
             res.append(d(x).unsqueeze(0))
         x = torch.cat(res)
         x = torch.mean(x,dim=0)
-        return self.lm_head(x)
+        return self.lm_head(self.norm(x))
 
     @torch.inference_mode()
     def generate(self, inp, tokenizer, max_gen_len: int, *args):
