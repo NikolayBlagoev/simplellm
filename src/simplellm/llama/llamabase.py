@@ -164,7 +164,7 @@ class Attention(nn.Module):
         # xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
         # xq = xq.contiguous()
         # xv = xv.contiguous()
-        xk = xk.contiguous()
+        # xk = xk.contiguous()
         # TODO: Implement self...
         o = F.scaled_dot_product_attention(
             xq,
