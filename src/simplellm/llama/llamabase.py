@@ -160,19 +160,21 @@ class Attention(nn.Module):
 
 
         xq, xk = apply_rotary_emb(xq, xk, cos, sin)
-        # xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
-        # xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
-        # xq = xq.contiguous()
-        # xv = xv.contiguous()
-        # xk = xk.contiguous()
+        
+        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
+        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+        xq = xq.contiguous()
+        xv = xv.contiguous()
+        xk = xk.contiguous()
         # TODO: Implement self...
+        
         o = F.scaled_dot_product_attention(
             xq,
             xk,
             xv,
             attn_mask=None,
             is_causal=True
-        )
+        ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
         o = self.o_proj(o)
         
