@@ -112,7 +112,7 @@ class GPTBlock(nn.Module):
         self.norm2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         
     def forward(self, x, mask=None):
-        x_ = self.attn(x)
+        x_ = self.attention(x)
         x_ = self.norm1(x + x_)
         m = self.mlp(x_)
         return self.norm2(x_ + m)
