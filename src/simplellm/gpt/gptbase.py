@@ -92,7 +92,7 @@ class MLP(nn.Module):
         self.c_fc = Conv1D(dim_feedforward, dmodel).to(device)
         self.c_proj = Conv1D(dmodel, dim_feedforward).to(device)
         self.act = NewGELU().to(device)
-        self.dropout = nn.Dropout(config.resid_pdrop).to(device)
+        self.dropout = nn.Dropout(dropout_prob).to(device)
 
     def forward(self, x):
         h = self.act(self.c_fc(x))
