@@ -14,8 +14,8 @@ class Attention(nn.Module):
         )
         self.num_heads = num_heads
         self.split_size = dmodel
-        self.c_attn = nn.Conv1D(dmodel * 3, dmodel)
-        self.c_proj = nn.Conv1D(dmodel, dmodel)
+        self.c_attn = nn.Conv1d(dmodel * 3, dmodel)
+        self.c_proj = nn.Conv1d(dmodel, dmodel)
         self.attn_dropout = nn.Dropout(dropout_prob)
         self.resid_dropout = nn.Dropout(dropout_prob)
         
@@ -73,7 +73,7 @@ class MLP(nn.Module):
     def __init__(self, dmodel, dim_feedforward, dropout_prob = 0.1, device = "cuda"):
         super().__init__()
         self.c_fc = nn.Conv1d(dim_feedforward, dmodel).to(device)
-        self.c_proj = nn.Conv1D(dmodel, dim_feedforward).to(device)
+        self.c_proj = nn.Conv1d(dmodel, dim_feedforward).to(device)
         self.act = NewGELU().to(device)
         self.dropout = nn.Dropout(config.resid_pdrop).to(device)
 
