@@ -2,7 +2,24 @@ from typing import Literal
 from torch import nn
 import torch
 
+class Conv1D(nn.Module):
+    def __init__(self, nf, nx):
+        super().__init__()
+        self.nf = nf
+        self.nx = nx
+        self.weight = nn.Parameter(torch.empty(nx, nf))
+        self.bias = nn.Parameter(torch.zeros(nf))
+        nn.init.normal_(self.weight, std=0.02)
 
+    def __repr__(self) -> str:
+        return "Conv1D(nf={nf}, nx={nx})".format(**self.__dict__)
+
+    def forward(self, x):
+        size_out = x.size()[:-1] + (self.nf,)
+        x = torch.addmm(self.bias, x.view(-1, x.size(-1)), self.weight)
+        x = x.view(size_out)
+        return x
+    
 class Attention(nn.Module):
     def __init__(self, dmodel, ctx_size, num_heads, dropout_prob = 0.1, device = "cuda"):
         super().__init__()
@@ -14,8 +31,8 @@ class Attention(nn.Module):
         )
         self.num_heads = num_heads
         self.split_size = dmodel
-        self.c_attn = nn.Conv1d(dmodel * 3, dmodel)
-        self.c_proj = nn.Conv1d(dmodel, dmodel)
+        self.c_attn = Conv1D(dmodel * 3, dmodel)
+        self.c_proj = Conv1D(dmodel, dmodel)
         self.attn_dropout = nn.Dropout(dropout_prob)
         self.resid_dropout = nn.Dropout(dropout_prob)
         
@@ -72,8 +89,8 @@ class NewGELU(nn.Module):
 class MLP(nn.Module):
     def __init__(self, dmodel, dim_feedforward, dropout_prob = 0.1, device = "cuda"):
         super().__init__()
-        self.c_fc = nn.Conv1d(dim_feedforward, dmodel).to(device)
-        self.c_proj = nn.Conv1d(dmodel, dim_feedforward).to(device)
+        self.c_fc = Conv1D(dim_feedforward, dmodel).to(device)
+        self.c_proj = Conv1D(dmodel, dim_feedforward).to(device)
         self.act = NewGELU().to(device)
         self.dropout = nn.Dropout(config.resid_pdrop).to(device)
 
