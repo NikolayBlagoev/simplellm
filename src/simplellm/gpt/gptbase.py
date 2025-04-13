@@ -2,74 +2,123 @@ from typing import Literal
 from torch import nn
 import torch
 
+
+class Attention(nn.Module):
+    def __init__(self, dmodel, ctx_size, num_heads, dropout_prob = 0.1, device = "cuda"):
+        super().__init__()
+        
+        self.register_buffer(
+            "bias",
+            torch.tril(torch.ones(ctx_size, ctx_size)).view(1, 1, ctx_size, ctx_size),
+            persistent=False,
+        )
+        self.num_heads = num_heads
+        self.split_size = dmodel
+        self.c_attn = nn.Conv1D(dmodel * 3, dmodel)
+        self.c_proj = nn.Conv1D(dmodel, dmodel)
+        self.attn_dropout = nn.Dropout(dropout_prob)
+        self.resid_dropout = nn.Dropout(dropout_prob)
+        
+
+    def _attn(self, q, k, v):
+        w = torch.matmul(q, k)
+        
+        b = self.bias[:, :, : w.size(-2), : w.size(-1)]
+        w = w * b + -1e4 * (1 - b)
+
+
+        w = nn.functional.softmax(w, dim=-1)
+        w = self.attn_dropout(w)
+
+        
+        return torch.matmul(w, v)
+
+    def merge_heads(self, x):
+        x = x.permute(0, 2, 1, 3).contiguous()
+        new_x_shape = x.size()[:-2] + (x.size(-2) * x.size(-1),)
+        return x.view(*new_x_shape)
+
+    def split_heads(self, x, k=False):
+        new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
+        x = x.view(*new_x_shape)
+        if k:
+            return x.permute(0, 2, 3, 1)
+        else:
+            return x.permute(0, 2, 1, 3)
+
+    def forward(self, x):
+        x = self.c_attn(x)
+        query, key, value = x.split(self.split_size, dim=2)
+        query = self.split_heads(query)
+        key = self.split_heads(key, k=True)
+        value = self.split_heads(value)
+
+        a = self._attn(query, key, value)
+
+        a = self.merge_heads(a)
+        a = self.c_proj(a)
+        a = self.resid_dropout(a)
+
+        return a 
+
+class NewGELU(nn.Module):
+    """
+    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT).
+    Reference: Gaussian Error Linear Units (GELU) paper: https://arxiv.org/abs/1606.08415
+    """
+    def forward(self, x):
+        return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
+
+class MLP(nn.Module):
+    def __init__(self, dmodel, dim_feedforward, dropout_prob = 0.1, device = "cuda"):
+        super().__init__()
+        self.c_fc = nn.Conv1d(dim_feedforward, dmodel).to(device)
+        self.c_proj = nn.Conv1D(dmodel, dim_feedforward).to(device)
+        self.act = NewGELU().to(device)
+        self.dropout = nn.Dropout(config.resid_pdrop).to(device)
+
+    def forward(self, x):
+        h = self.act(self.c_fc(x))
+        h2 = self.c_proj(h)
+        return self.dropout(h2)
+
+
+
 class GPTBlock(nn.Module):
     def __init__(self, dmodel, num_heads, dim_feedforward = 0, norm_eps = 1e-5, dropout_prob = 0.1, ctx_size = 2048, device = "cuda") -> None:
         super().__init__()
         if dim_feedforward == 0:
             dim_feedforward = dmodel * 4
-        self.multihead_attn = nn.MultiheadAttention(embed_dim = dmodel, num_heads = num_heads, bias=True, batch_first = True).to(device)
+        self.attention = Attention(dmodel, ctx_size, num_heads, dropout_prob, device)
         self.norm1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
+        self.mlp = MLP(dmodel, dim_feedforward, dropout_prob, device)
         self.norm2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
-        self.register_buffer("masked_attention",(1 - torch.tril(torch.ones(ctx_size, ctx_size))).to(device = device, dtype=torch.bool))
-        self.mlp = nn.Sequential(
-            nn.Linear(dmodel, dim_feedforward),
-            nn.GELU(),
-            nn.Linear(dim_feedforward, dmodel),
-            nn.Dropout(dropout_prob)
-        ).to(device)
-    def forward(self, x):
-        _, tkns, _ = x.size()
-        x_ = self.norm1(x)
-        x_, _ = self.multihead_attn(x_, x_, x_, attn_mask=self.masked_attention[:tkns,:tkns])
-        x = x_ + x
-        x_ = self.norm2(x)
         
-        x = x + self.mlp(x_)
-        return x
+    def forward(self, x, mask=None):
+        _, tkns, _ = x.size()
+        x_ = self.attn(x)
+        x_ = self.norm1(x + x_)
+        m = self.mlp(x_)
+        return self.norm2(x_ + m)
 
     
 
 class GPTEmbedding(nn.Module):
-    def __init__(self, vocab_size, dmodel, ctx_size = 2048, padding_idx = None, device = "cuda") -> None:
+    def __init__(self, vocab_size, dmodel, ctx_size = 2048, dropout_prob = 0.1, padding_idx = None, device = "cuda") -> None:
         super().__init__()
-        self.word_embedding = nn.Embedding(vocab_size, dmodel, padding_idx=padding_idx, max_norm=None,  norm_type=2, scale_grad_by_freq=False, sparse=False).to(device)
+        self.word_embedding = nn.Embedding(vocab_size, dmodel, padding_idx=padding_idx).to(device)
         self.pos_embedding = nn.Embedding(ctx_size, dmodel).to(device)
+        self.drop = nn.Dropout(dropout_prob)
     
     def forward(self, x, positions = None):
        
         _, sz = x.shape
         if positions == None:
-            positions = torch.arange(sz, device=x.device)
+            positions = torch.arange(0, sz, device=x.device, dtype=torch.long).unsqueeze(0)
         word_embeddings = self.word_embedding(x)
         pos_embeddings = self.pos_embedding(positions)[None, ...]
-        return word_embeddings + pos_embeddings
+        return self.drop(word_embeddings + pos_embeddings)
 
-class GPTClassification(nn.Module):
-    def __init__(self, vocab_size, dmodel, norm_eps=1e-5, type: Literal["cross_entropy", "seq_2_seq"] = "cross_entropy", device = "cuda") -> None:
-        super().__init__()
-        self.type = type
-        
-        
-        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
-        self.norm1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
-        
-        self.sfmx = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [100, 1000, 10000],device=device)
 
-    def forward(self, x, targets):
-        if self.type == "cross_entropy":
-            x = self.norm1(x)
-            x = self.lm_head(x)
-            x = torch.swapaxes(x, 1, 2)
-            return nn.functional.cross_entropy(x, targets)
-        elif self.type == "seq_2_seq":
-            # from : https://github.com/DS3Lab/DT-FM
-            x = self.norm1(x)
-            
-            shifted_x = x[..., :-1, :].contiguous()
-            shifted_targets = targets[..., 1:].contiguous()
-            # print(x.shape, shifted_x.shape, shifted_targets.shape, targets.shape)
-            return self.sfmx(shifted_x.view(-1, self.sfmx.in_features), shifted_targets.view(-1)).loss
-        else:
-            raise NotImplemented(f"Not a valid method ${self.type}")
 
     
