@@ -23,7 +23,7 @@ class GPTStage(nn.Module):
         return self.transformers(x)
 
 class GPTFirstStage(nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda", share_weights = False, de_embed = True) -> None:
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, dropout_prob = 0.1, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, padding_idx = None, device = "cuda", share_weights = False, de_embed = True) -> None:
         super().__init__()
         self._embedding = GPTEmbedding(vocab_size,dmodel,ctx_size,padding_idx = padding_idx,device = device)
         
