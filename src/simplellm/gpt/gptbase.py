@@ -1,6 +1,7 @@
 from typing import Literal
 from torch import nn
 import torch
+import math
 
 class Conv1D(nn.Module):
     def __init__(self, nf, nx, device = "cuda"):
