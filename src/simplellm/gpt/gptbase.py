@@ -26,7 +26,7 @@ class Attention(nn.Module):
         
         self.register_buffer(
             "bias",
-            torch.tril(torch.ones(ctx_size, ctx_size)).view(1, 1, ctx_size, ctx_size),
+            torch.tril(torch.ones(ctx_size, ctx_size)).view(1, 1, ctx_size, ctx_size).to(device),
             persistent=False,
         )
         self.num_heads = num_heads
