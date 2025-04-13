@@ -56,7 +56,7 @@ class Attention(nn.Module):
         return x.view(*new_x_shape)
 
     def split_heads(self, x, k=False):
-        new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
+        new_x_shape = x.size()[:-1] + (self.num_heads, x.size(-1) // self.num_heads)
         x = x.view(*new_x_shape)
         if k:
             return x.permute(0, 2, 3, 1)
