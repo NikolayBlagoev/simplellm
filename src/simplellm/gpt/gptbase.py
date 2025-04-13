@@ -112,8 +112,6 @@ class GPTBlock(nn.Module):
         self.norm2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         
     def forward(self, x, mask=None):
-        print("shape of ",x.shape)
-        _, tkns, _ = x.size()
         x_ = self.attn(x)
         x_ = self.norm1(x + x_)
         m = self.mlp(x_)
@@ -135,7 +133,6 @@ class GPTEmbedding(nn.Module):
             positions = torch.arange(0, sz, device=x.device, dtype=torch.long).unsqueeze(0)
         word_embeddings = self.word_embedding(x)
         pos_embeddings = self.pos_embedding(positions)[None, ...]
-        print("word embeddings are ",word_embeddings.shape)
         return self.drop(word_embeddings + pos_embeddings)
 
 
