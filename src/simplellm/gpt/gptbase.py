@@ -65,6 +65,7 @@ class Attention(nn.Module):
 
     def forward(self, x):
         x = self.c_attn(x)
+        print(x.size(), self.split_size)
         query, key, value = x.split(self.split_size, dim=2)
         query = self.split_heads(query)
         key = self.split_heads(key, k=True)
