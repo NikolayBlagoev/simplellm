@@ -126,14 +126,14 @@ class GPTEmbedding(nn.Module):
         self.word_embedding = nn.Embedding(vocab_size, dmodel, padding_idx=padding_idx).to(device)
         self.pos_embedding = nn.Embedding(ctx_size, dmodel).to(device)
         self.drop = nn.Dropout(dropout_prob)
-    
+        self.register_buffer("position_ids", torch.arange(ctx_size).to(device), persistent=False)
     def forward(self, x, positions = None):
        
         _, sz = x.shape
         if positions == None:
-            positions = torch.arange(0, sz, device=x.device, dtype=torch.long).unsqueeze(0)
+            positions = self.position_ids[None, : sz]
         word_embeddings = self.word_embedding(x)
-        pos_embeddings = self.pos_embedding(positions)[None, ...]
+        pos_embeddings = self.pos_embedding(positions)
         return self.drop(word_embeddings + pos_embeddings)
 
 
