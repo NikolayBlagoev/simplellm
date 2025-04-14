@@ -40,7 +40,7 @@ class Attention(nn.Module):
 
     def _attn(self, q, k, v):
         w = torch.matmul(q, k)
-        
+        w = w / math.sqrt(v.size(-1))
         b = self.bias[:, :, : w.size(-2), : w.size(-1)]
         w = w * b + -1e4 * (1 - b)
 
