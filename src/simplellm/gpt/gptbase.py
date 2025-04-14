@@ -109,15 +109,15 @@ class GPTBlock(nn.Module):
         if dim_feedforward == 0:
             dim_feedforward = dmodel * 4
         self.attn = Attention(dmodel, ctx_size, num_heads, dropout_prob, device)
-        self.norm1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
+        self.ln_1 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         self.mlp = MLP(dmodel, dim_feedforward, dropout_prob, device)
-        self.norm2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
+        self.ln_2 = nn.LayerNorm(dmodel, eps=norm_eps).to(device)
         
     def forward(self, x, mask=None):
         x_ = self.attn(x)
-        x_ = self.norm1(x + x_)
+        x_ = self.ln_1(x + x_)
         m = self.mlp(x_)
-        return self.norm2(x_ + m)
+        return self.ln_2(x_ + m)
 
     
 

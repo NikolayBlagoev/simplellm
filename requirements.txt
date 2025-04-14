@@ -2,3 +2,4 @@ datasets
 sentencepiece
 torch
 requests
+transformers

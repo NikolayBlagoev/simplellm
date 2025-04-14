@@ -1,6 +1,51 @@
 from torch import nn
 import torch
 from simplellm.gpt.gptbase import *
+from simplellm.utils import IterableModule
+
+
+class CausalGPT(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel, num_heads, dim_feedforward = 0, norm_eps = 1e-5, dropout_prob = 0.1, ctx_size = 2048, device = "cuda", n_layers = 4):
+        super().__init__()
+        self.tokens_embed = nn.Embedding(vocab_size, dmodel).to(device)
+        self.positions_embed = nn.Embedding(ctx_size, dmodel).to(device)
+        self.drop = nn.Dropout(dropout_prob)
+        self.register_buffer("position_ids", torch.arange(ctx_size).to(device), persistent=False)
+        self.h = nn.ModuleList([
+                    GPTBlock(
+                        dmodel=dmodel,
+                        num_heads=num_heads,
+                        dim_feedforward=dim_feedforward,
+                        norm_eps=norm_eps,
+                        dropout_prob=dropout_prob,
+                        ctx_size=ctx_size,
+                        device=device
+                    ) for _ in range(n_layers)
+                ])
+    
+    def forward(self, x):
+        _, sz = x.shape
+        positions = self.position_ids[None, : sz]
+        word_embeddings = self.tokens_embed(x)
+        pos_embeddings = self.positions_embed(positions)
+        h = self.drop(word_embeddings + pos_embeddings)
+        for i, block in enumerate(self.h): 
+            h = block(h)
+        return h
+
+class GPT(IterableModule, nn.Module):
+    def __init__(self, mdl_type, vocab_size, dmodel, num_heads, dim_feedforward = 0, norm_eps = 1e-5, dropout_prob = 0.1, ctx_size = 2048, device = "cuda", n_layers = 4):
+        super().__init__()
+        self.transformer = mdl_type(vocab_size, dmodel, num_heads, dim_feedforward = dim_feedforward, norm_eps = norm_eps, dropout_prob = dropout_prob, ctx_size = ctx_size, device = device, n_layers = n_layers)
+        self.lm_head = nn.Linear(dmodel, vocab_size, bias=False, device=device)
+    
+    def forward(self, x):
+        out = self.transformer(x)
+        
+        return self.lm_head(out)
+           
+
+
 
 class GPTStage(nn.Module):
     def __init__(self, dmodel, num_heads, dim_feedforward = 0, norm_eps = 1e-5, dropout_prob = 0.1, ctx_size = 2048, device = "cuda", n_layers = 4) -> None:

@@ -14,7 +14,8 @@ setup(
     install_requires=['datasets',
                       'torch',
                       'sentencepiece',
-                      'requests'                     
+                      'requests',
+                      'transformers'                 
                       ],
     classifiers=["Programming Language :: Python :: 3",
                 "License :: OSI Approved :: MIT License",
