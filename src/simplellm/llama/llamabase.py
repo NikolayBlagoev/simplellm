@@ -22,7 +22,7 @@ class RMSNorm(torch.nn.Module):
         
         output = self._norm(x.float()).type_as(x)
         
-        return output * self.weight
+        return self.weight * output
 # CORRECT
 class RoPE(nn.Module):
     def __init__(self, dim, theta=10000.0, device="cuda"):
@@ -217,7 +217,7 @@ class FeedForward(nn.Module):
 
 # CHECKED
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
+    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-6, ffn_dim_multiplier = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel

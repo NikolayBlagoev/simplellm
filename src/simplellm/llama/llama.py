@@ -4,19 +4,20 @@ import torch
 from typing import Union
 from torch import nn
 import torch.nn.functional as F
-class LLamaSeq(nn.Sequential):
+from simplellm.utils import IterableModule
+class LLamaSeq(IterableModule, nn.ModuleList):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings = inputs
         for module in self._modules.values():
             x = module(x, start_p, mask, position_embeddings )
         return x
-class CausalLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+class CausalLLama(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         self.layers = LLamaSeq(
-            *[
+            [
                 TransformerBlock(
                     dmodel=dmodel,
                     num_heads=num_heads,
@@ -42,7 +43,7 @@ class CausalLLama(nn.Module):
         return h
 
 
-class SkipSeq(nn.Sequential):
+class SkipSeq(IterableModule, nn.Sequential):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings , to_skip = inputs
         for module in self._modules.values():
@@ -52,7 +53,7 @@ class SkipSeq(nn.Sequential):
         return x
 
 
-class SwapSeq(nn.Sequential):
+class SwapSeq(IterableModule, nn.Sequential):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings, order = inputs
         #print(order)
@@ -63,8 +64,8 @@ class SwapSeq(nn.Sequential):
             x = module(x, start_p, mask, position_embeddings)
         return x
 
-class SkipLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+class SkipLLama(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -95,8 +96,8 @@ class SkipLLama(nn.Module):
         return h
 
 
-class SwapLLama(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+class SwapLLama(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -131,8 +132,8 @@ class SwapLLama(nn.Module):
         return h
 
     
-class LLama(nn.Module):
-    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, shared = False):
+class LLama(IterableModule, nn.Module):
+    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, shared = False):
         super().__init__()
         self.max_seq = ctx_size
         self.device = device
@@ -141,6 +142,7 @@ class LLama(nn.Module):
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         if shared:
             self.model.embed_tokens.weight = self.lm_head.weight
+        self._initialize()
     def forward(self, x, **kwargs):
         #print(*args) 
         return self.lm_head(self.model(x,**kwargs))
@@ -190,8 +192,8 @@ class LLama(nn.Module):
         return out_tokens
     
 
-class LLamaStage(nn.Module):
-    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
+class LLamaStage(IterableModule, nn.Module):
+    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
         
@@ -213,7 +215,9 @@ class LLamaStage(nn.Module):
         
         )
         self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        self._initialize()
         
+    
     def forward(self, x, start_p = 0):
         B, seq_l, _ = x.shape
         position_embeddings = self.rotary_emb(x,B,seq_l)
@@ -222,8 +226,8 @@ class LLamaStage(nn.Module):
         
         return h
 
-class LLamaFirstStage(nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-5, ffn_dim_multiplier = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True) -> None:
+class LLamaFirstStage(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-6, ffn_dim_multiplier = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True) -> None:
         super().__init__()
         self._embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
         
@@ -252,6 +256,7 @@ class LLamaFirstStage(nn.Module):
             
             )
             self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        self._initialize()
         
         
     def embed(self, x):
@@ -268,8 +273,8 @@ class LLamaFirstStage(nn.Module):
        
         return  self.lm_head(self.norm(x))
 
-class LLamaLastStage(nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-5, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
+class LLamaLastStage(IterableModule, nn.Module):
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
         
@@ -293,6 +298,7 @@ class LLamaLastStage(nn.Module):
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        self._initialize()
         
     def forward(self, x, start_p = 0):
         B, seq_l, _ = x.shape

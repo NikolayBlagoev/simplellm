@@ -1,5 +1,5 @@
 from .custom_linear import *
-
+from .weight_initializer import *
 class State:
     _SEED = 15
 
