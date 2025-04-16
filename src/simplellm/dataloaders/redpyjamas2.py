@@ -21,7 +21,8 @@ class RedPyjamav2(object):
         self.seq_l = seq_l
         print(f"... DATASET LOADED...")
     def tokenization(self, t):
-        return {"text": self.tokenizer.encode(t["text"])}
+        
+        return {"text": list(map(lambda el: self.tokenizer.encode(el),t["raw_content"]))}
     def get_data(self):
         return self.dl
     
