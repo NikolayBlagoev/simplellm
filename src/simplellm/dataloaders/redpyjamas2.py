@@ -9,7 +9,7 @@ class RedPyjamav2(object):
     
 
     def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0,name = "default", skip = 0):
-        dataset = load_dataset("togethercomputer/RedPajama-Data-V2", name=name, streaming = streaming, trust_remote_code=True)
+        dataset = load_dataset("togethercomputer/RedPajama-Data-V2", name=name, streaming = streaming, trust_remote_code=True,languages=["en"])
         
         iterable_dataset = dataset.shuffle(buffer_size=10_000,seed=State.get_seed()).skip(skip)
         iterable_dataset = iterable_dataset.map(self.tokenization, batched=True, batch_size=batch_size)
