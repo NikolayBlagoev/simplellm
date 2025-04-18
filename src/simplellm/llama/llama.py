@@ -5,31 +5,31 @@ from typing import Union
 from torch import nn
 import torch.nn.functional as F
 from simplellm.utils import IterableModule
-from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from transformers import LlamaConfig
 class LLamaSeq(IterableModule, nn.ModuleList):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings = inputs
         for module in self._modules.values():
-            # print("a",module.layer_idx)
-            
-            x = module(hidden_states = x, position_embeddings = position_embeddings, attention_mask = None)[0]
+            x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(IterableModule, nn.Module):
     def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
-        config = LlamaConfig(vocab_size=vocab_size, intermediate_size=4*dmodel,hidden_size=dmodel, rms_norm_eps=norm_eps, num_attention_heads=num_heads, attention_bias=False, max_position_embeddings=ctx_size)
-        config._attn_implementation = "sdpa"
+        
         self.layers = LLamaSeq(
             [
-                LlamaDecoderLayer(
-                    config,    
-                    i
-                ).to(device) for i in range(n_layers)
-            ]
-        
-        )
+                TransformerBlock(
+                    dmodel=dmodel,
+                    num_heads=num_heads,
+                    ctx_size = ctx_size,
+                    multiple_of=multiple_of,
+                    norm_eps=norm_eps,
+                    ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
+                    idx = i,
+                    device = device
+                ) for i in range(n_layers)
+            ])
         self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
@@ -45,7 +45,7 @@ class CausalLLama(IterableModule, nn.Module):
 
 class SkipSeq(IterableModule, nn.Sequential):
     def forward(self, *inputs):
-        x, start_p, mask, position_embeddings, to_skip = inputs
+        x, start_p, mask, position_embeddings , to_skip = inputs
         for module in self._modules.values():
             if module.idx in to_skip:
                 continue
@@ -196,14 +196,21 @@ class LLamaStage(IterableModule, nn.Module):
     def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
-        config = LlamaConfig(intermediate_size=4*dmodel,hidden_size=dmodel, rms_norm_eps=norm_eps, num_attention_heads=num_heads, attention_bias=False, max_position_embeddings=ctx_size)
-        config._attn_implementation = "sdpa"
-        self.layers = LLamaSeq(
-            [
-                LlamaDecoderLayer(
-                    config,    
-                    i
-                ).to(device) for i in range(n_layers)
+        
+        self.layers = SkipSeq(
+            *[
+                TransformerBlock(
+                    dmodel=dmodel,
+                    num_heads=num_heads,
+                    ctx_size = ctx_size,
+                    multiple_of=multiple_of,
+                    norm_eps=norm_eps,
+                    ffn_dim_multiplier=ffn_dim_multiplier, 
+                    num_kv_heads = num_kv_heads,
+                    idx = i,
+                    device = device,
+                    linear_implementation = linear_implementation
+                ) for i in range(n_layers)
             ]
         
         )
@@ -215,7 +222,7 @@ class LLamaStage(IterableModule, nn.Module):
         B, seq_l, _ = x.shape
         position_embeddings = self.rotary_emb(x,B,seq_l)
         
-        h = self.layers(x,start_p,None,position_embeddings)
+        h = self.layers(x,start_p,None,position_embeddings,[])
         
         return h
 

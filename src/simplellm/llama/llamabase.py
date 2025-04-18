@@ -173,7 +173,8 @@ class Attention(nn.Module):
             xk,
             xv,
             attn_mask=None,
-            is_causal=True
+            is_causal=True,
+            scale = self.scaling
         ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
         o = self.o_proj(o)
