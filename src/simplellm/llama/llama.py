@@ -49,6 +49,7 @@ class SkipSeq(IterableModule, nn.Sequential):
         for module in self._modules.values():
             if module.idx in to_skip:
                 continue
+            print("running",module.idx)
             x = module(x, start_p, mask, position_embeddings)
         return x
 
