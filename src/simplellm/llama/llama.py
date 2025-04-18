@@ -26,7 +26,7 @@ class CausalLLama(IterableModule, nn.Module):
                 LlamaDecoderLayer(
                     config,    
                     i
-                ) for i in range(n_layers)
+                ).to(device) for i in range(n_layers)
             ]
         
         )
@@ -203,7 +203,7 @@ class LLamaStage(IterableModule, nn.Module):
                 LlamaDecoderLayer(
                     config,    
                     i
-                ) for i in range(n_layers)
+                ).to(device) for i in range(n_layers)
             ]
         
         )
