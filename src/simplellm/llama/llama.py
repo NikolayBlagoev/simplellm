@@ -11,7 +11,7 @@ class LLamaSeq(IterableModule, nn.ModuleList):
     def forward(self, *inputs):
         x, start_p, mask, position_embeddings = inputs
         for module in self._modules.values():
-            print("a",module.layer_idx)
+            # print("a",module.layer_idx)
             
             x = module(hidden_states = x, position_embeddings = position_embeddings, attention_mask = None)[0]
         return x
