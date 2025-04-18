@@ -196,7 +196,7 @@ class LLamaStage(IterableModule, nn.Module):
     def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
-        config = LlamaConfig(vocab_size=vocab_size, intermediate_size=4*dmodel,hidden_size=dmodel, rms_norm_eps=norm_eps, num_attention_heads=num_heads, attention_bias=False, max_position_embeddings=ctx_size)
+        config = LlamaConfig(intermediate_size=4*dmodel,hidden_size=dmodel, rms_norm_eps=norm_eps, num_attention_heads=num_heads, attention_bias=False, max_position_embeddings=ctx_size)
         config._attn_implementation = "sdpa"
         self.layers = LLamaSeq(
             [
