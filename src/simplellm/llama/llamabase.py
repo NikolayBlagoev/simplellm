@@ -186,19 +186,20 @@ class FeedForward(nn.Module):
     def __init__(
         self,
         dim: int,
-        hidden_dim: int,
-        multiple_of: int,
-        ffn_dim_multiplier: Optional[float],
+        hidden_dim: Optional[int],
         device = "cuda",
         linear_implementation = "torch"
     ):
         
         super().__init__()
-        hidden_dim = 4 * dim
+        
         
         # custom dim factor multiplier
-        if ffn_dim_multiplier is not None:
-            hidden_dim = int(ffn_dim_multiplier * hidden_dim)
+        if hidden_dim is not None:
+            hidden_dim = hidden_dim
+        else:
+            hidden_dim = 4 * dim
+
        
         if linear_implementation == "torch":
             linear_implementation = nn.Linear
@@ -218,7 +219,7 @@ class FeedForward(nn.Module):
 
 # CHECKED
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, ctx_size, multiple_of = 256, norm_eps = 1e-6, ffn_dim_multiplier = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
+    def __init__(self, dmodel, num_heads, ctx_size, norm_eps = 1e-6, hidden_dim = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
@@ -226,9 +227,7 @@ class TransformerBlock(nn.Module):
         self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation,num_kv_heads=num_kv_heads)
         self.mlp = FeedForward(
             dim=dmodel,
-            hidden_dim= dmodel,
-            multiple_of=multiple_of,
-            ffn_dim_multiplier=ffn_dim_multiplier,
+            hidden_dim= hidden_dim,
             device=device,
             linear_implementation=linear_implementation
         )

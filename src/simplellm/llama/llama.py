@@ -12,7 +12,7 @@ class LLamaSeq(IterableModule, nn.ModuleList):
             x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -22,9 +22,9 @@ class CausalLLama(IterableModule, nn.Module):
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
-                    multiple_of=multiple_of,
+                    hidden_dim=hidden_dim,
                     norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
+
                     num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device
@@ -66,7 +66,7 @@ class SwapSeq(IterableModule, nn.Sequential):
         return x
 
 class SkipLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -76,9 +76,8 @@ class SkipLLama(IterableModule, nn.Module):
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
-                    multiple_of=multiple_of,
+                    hidden_dim=hidden_dim,
                     norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
                     num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device
@@ -98,7 +97,7 @@ class SkipLLama(IterableModule, nn.Module):
 
 
 class SwapLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -108,9 +107,8 @@ class SwapLLama(IterableModule, nn.Module):
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
-                    multiple_of=multiple_of,
-                    norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
+                    hidden_dim=hidden_dim,
+                    norm_eps=norm_eps, 
                     num_kv_heads=num_kv_heads,
                     idx = i,
                     device = device
@@ -134,11 +132,11 @@ class SwapLLama(IterableModule, nn.Module):
 
     
 class LLama(IterableModule, nn.Module):
-    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, ffn_dim_multiplier = None, shared = False):
+    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, shared = False):
         super().__init__()
         self.max_seq = ctx_size
         self.device = device
-        self.model = mdl_type(vocab_size,dmodel,num_heads,multiple_of,norm_eps,dropout_prob,ctx_size,num_kv_heads,padding_idx,device,n_layers,ffn_dim_multiplier)
+        self.model = mdl_type(vocab_size=vocab_size,dmodel=dmodel,num_heads=num_heads,hidden_dim=hidden_dim,norm_eps=norm_eps,dropout_prob=dropout_prob,ctx_size=ctx_size,num_kv_heads=num_kv_heads,padding_idx=padding_idx,device=device,n_layers=n_layers)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         if shared:
@@ -194,7 +192,7 @@ class LLama(IterableModule, nn.Module):
     
 
 class LLamaStage(IterableModule, nn.Module):
-    def __init__(self, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
+    def __init__(self, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
         
@@ -204,9 +202,8 @@ class LLamaStage(IterableModule, nn.Module):
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
-                    multiple_of=multiple_of,
+                    hidden_dim=hidden_dim,
                     norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
                     num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device,
@@ -228,7 +225,7 @@ class LLamaStage(IterableModule, nn.Module):
         return h
 
 class LLamaFirstStage(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, multiple_of = 256, norm_eps = 1e-6, ffn_dim_multiplier = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True) -> None:
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, hidden_dim = None, norm_eps = 1e-6, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True) -> None:
         super().__init__()
         self._embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
         
@@ -245,9 +242,8 @@ class LLamaFirstStage(IterableModule, nn.Module):
                         dmodel=dmodel,
                         num_heads=num_heads,
                         ctx_size = ctx_size,
-                        multiple_of=multiple_of,
+                        hidden_dim=hidden_dim,
                         norm_eps=norm_eps,
-                        ffn_dim_multiplier=ffn_dim_multiplier, 
                         num_kv_heads = num_kv_heads,
                         idx = i,
                         device = device,
@@ -275,7 +271,7 @@ class LLamaFirstStage(IterableModule, nn.Module):
         return  self.lm_head(self.norm(x))
 
 class LLamaLastStage(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, multiple_of = 256, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", ffn_dim_multiplier = None, linear_implementation = "torch", theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0) -> None:
         super().__init__()
         
         
@@ -285,9 +281,8 @@ class LLamaLastStage(IterableModule, nn.Module):
                     dmodel=dmodel,
                     num_heads=num_heads,
                     ctx_size = ctx_size,
-                    multiple_of=multiple_of,
+                    hidden_dim=hidden_dim,
                     norm_eps=norm_eps,
-                    ffn_dim_multiplier=ffn_dim_multiplier, 
                     num_kv_heads = num_kv_heads,
                     idx = i,
                     device = device,
