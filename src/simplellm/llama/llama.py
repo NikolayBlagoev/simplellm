@@ -12,7 +12,7 @@ class LLamaSeq(IterableModule, nn.ModuleList):
             x = module(x, start_p, mask, position_embeddings )
         return x
 class CausalLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, head_dim = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0, rope_parameters = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -24,13 +24,17 @@ class CausalLLama(IterableModule, nn.Module):
                     ctx_size = ctx_size,
                     hidden_dim=hidden_dim,
                     norm_eps=norm_eps,
-
+                    head_dim = head_dim,
                     num_kv_heads = num_kv_heads,
                     idx = i,
+                    dropout_prob = dropout_prob,
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        if rope_parameters == None:
+            self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+        else:
+            self.rotary_emb = RoPE(**rope_parameters)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, **kwargs):
@@ -66,7 +70,7 @@ class SwapSeq(IterableModule, nn.Sequential):
         return x
 
 class SkipLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, head_dim = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0, rope_parameters = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -80,10 +84,15 @@ class SkipLLama(IterableModule, nn.Module):
                     norm_eps=norm_eps,
                     num_kv_heads = num_kv_heads,
                     idx = i,
+                    dropout_prob = dropout_prob,
+                    head_dim = head_dim,
                     device = device
                 ) for i in range(n_layers)
             ])
-        self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        if rope_parameters == None:
+            self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+        else:
+            self.rotary_emb = RoPE(**rope_parameters)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x,  start_p = 0, mask = None, position_ids = None,to_skip = [], **kwargs):
@@ -97,7 +106,7 @@ class SkipLLama(IterableModule, nn.Module):
 
 
 class SwapLLama(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, head_dim = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, theta = 10000.0, rope_parameters = None) -> None:
         super().__init__()
         self.embed_tokens = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
@@ -111,13 +120,18 @@ class SwapLLama(IterableModule, nn.Module):
                     norm_eps=norm_eps, 
                     num_kv_heads=num_kv_heads,
                     idx = i,
+                    dropout_prob = dropout_prob,
+                    head_dim = head_dim,
                     device = device
                 ) for i in range(n_layers)
             ]
         )
         
             
-        self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        if rope_parameters == None:
+            self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+        else:
+            self.rotary_emb = RoPE(**rope_parameters)
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         
     def forward(self, x, start_p = 0, mask = None, position_ids = None, order = [], **kwargs):
@@ -132,11 +146,11 @@ class SwapLLama(IterableModule, nn.Module):
 
     
 class LLama(IterableModule, nn.Module):
-    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, shared = False):
+    def __init__(self, mdl_type: Union[SwapLLama,SkipLLama,CausalLLama],vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, head_dim = None, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", n_layers = 32, shared = False, rope_parameters = None):
         super().__init__()
         self.max_seq = ctx_size
         self.device = device
-        self.model = mdl_type(vocab_size=vocab_size,dmodel=dmodel,num_heads=num_heads,hidden_dim=hidden_dim,norm_eps=norm_eps,dropout_prob=dropout_prob,ctx_size=ctx_size,num_kv_heads=num_kv_heads,padding_idx=padding_idx,device=device,n_layers=n_layers)
+        self.model = mdl_type(vocab_size=vocab_size,dmodel=dmodel,num_heads=num_heads,hidden_dim=hidden_dim,norm_eps=norm_eps, head_dim = head_dim, dropout_prob=dropout_prob,ctx_size=ctx_size,num_kv_heads=num_kv_heads,padding_idx=padding_idx,device=device,n_layers=n_layers,rope_parameters = rope_parameters)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
         # self.lm_head = nn.AdaptiveLogSoftmaxWithLoss(dmodel, vocab_size, [1000, 2000, 5000],device=device)
         if shared:
@@ -192,7 +206,7 @@ class LLama(IterableModule, nn.Module):
     
 
 class LLamaStage(IterableModule, nn.Module):
-    def __init__(self, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0) -> None:
+    def __init__(self, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, ctx_size = 2048, n_layers = 4, head_dim = None, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0, rope_parameters = None) -> None:
         super().__init__()
         
         
@@ -206,13 +220,18 @@ class LLamaStage(IterableModule, nn.Module):
                     norm_eps=norm_eps,
                     num_kv_heads = num_kv_heads,
                     idx = i,
+                    dropout_prob = dropout_prob,
+                    head_dim = head_dim,
                     device = device,
                     linear_implementation = linear_implementation
                 ) for i in range(n_layers)
             ]
         
         )
-        self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        if rope_parameters == None:
+            self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+        else:
+            self.rotary_emb = RoPE(**rope_parameters)
         self._initialize()
         
     
@@ -225,9 +244,9 @@ class LLamaStage(IterableModule, nn.Module):
         return h
 
 class LLamaFirstStage(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, hidden_dim = None, norm_eps = 1e-6, ctx_size = 2048, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True) -> None:
+    def __init__(self, vocab_size, dmodel, num_heads, n_layers = 4, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, ctx_size = 2048, num_kv_heads = None, head_dim = None, padding_idx = None, device = "cuda", linear_implementation = "torch", share_weights = False, theta = 10000.0, de_embed = True, rope_parameters = None) -> None:
         super().__init__()
-        self._embedding = LLamaEmbedding(vocab_size,dmodel,padding_idx=padding_idx,device=device)
+        self._embedding = nn.Embedding(vocab_size, dmodel, padding_idx = padding_idx,device=device)
         
         if de_embed:
             self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
@@ -246,13 +265,18 @@ class LLamaFirstStage(IterableModule, nn.Module):
                         norm_eps=norm_eps,
                         num_kv_heads = num_kv_heads,
                         idx = i,
+                        dropout_prob = dropout_prob,
+                        head_dim = head_dim,
                         device = device,
                         linear_implementation = linear_implementation
                     ) for i in range(n_layers)
                 ]
             
             )
-            self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+            if rope_parameters == None:
+                self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+            else:
+                self.rotary_emb = RoPE(**rope_parameters)
         self._initialize()
         
         
@@ -271,7 +295,7 @@ class LLamaFirstStage(IterableModule, nn.Module):
         return  self.lm_head(self.norm(x))
 
 class LLamaLastStage(IterableModule, nn.Module):
-    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 1e2, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0) -> None:
+    def __init__(self, vocab_size, dmodel = 4096, num_heads = 32, hidden_dim = None, norm_eps = 1e-6, dropout_prob = 0, head_dim = None, ctx_size = 2048, n_layers = 4, num_kv_heads = None, padding_idx = None, device = "cuda", linear_implementation = "torch", theta = 10000.0, rope_parameters = None) -> None:
         super().__init__()
         
         
@@ -285,6 +309,8 @@ class LLamaLastStage(IterableModule, nn.Module):
                     norm_eps=norm_eps,
                     num_kv_heads = num_kv_heads,
                     idx = i,
+                    dropout_prob = dropout_prob,
+                    head_dim = head_dim,
                     device = device,
                     linear_implementation = linear_implementation
                 ) for i in range(n_layers)
@@ -293,7 +319,10 @@ class LLamaLastStage(IterableModule, nn.Module):
         )
         self.norm = RMSNorm(dmodel, eps=norm_eps,device=device)
         self.lm_head = nn.Linear(dmodel, vocab_size, bias=False,device=device)
-        self.rotary_emb = RoPE(dmodel // num_heads, theta=theta,device=device)
+        if rope_parameters == None:
+            self.rotary_emb = RoPE(initializing_function="linear",dim=dmodel // num_heads, theta=theta,device=device)
+        else:
+            self.rotary_emb = RoPE(**rope_parameters)
         self._initialize()
         
     def forward(self, x, start_p = 0):

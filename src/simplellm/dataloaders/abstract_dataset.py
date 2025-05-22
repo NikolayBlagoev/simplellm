@@ -21,6 +21,7 @@ class AbstractDataset(IterableDataset):
                 tmp =  tmp[self.seq_length:]
                 to_yield = torch.tensor(tmp_x)
                 yield to_yield
+            tmp = []
             
 
     def get_stream(self):

@@ -23,14 +23,34 @@ class RMSNorm(torch.nn.Module):
         output = self._norm(x.float()).type_as(x)
         
         return self.weight * output
+def _linear_rope(theta = 10000.0, dim = 4096, device = "cuda", **kwargs):
+    inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim))
+    return inv_freq,1.0
+
+def _llama3_rope(theta = 10000.0, dim = 4096, device = "cuda", factor = 8, low_freq_factor = 1, high_freq_factor = 4, ctx_size = 8192, **kwargs):
+    inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim))
+    low_freq_wv = ctx_size / low_freq_factor
+    high_freq_wv = ctx_size / high_freq_factor
+    wavelength = 2 * math.pi / inv_freq
+    msk = torch.where(wavelength > low_freq_wv, inv_freq / factor, inv_freq)
+    
+    smooth_factor = (ctx_size / wavelength - low_freq_factor) / (high_freq_factor - low_freq_factor)
+    smoothed_inv_freq = (1 - smooth_factor) * msk / factor + smooth_factor * msk
+    is_medium_freq = ~(wavelength < high_freq_wv) * ~(wavelength > low_freq_wv)
+    inv_freq = torch.where(is_medium_freq, smoothed_inv_freq, msk)
+
+    return inv_freq, 1.0
 # CORRECT
 class RoPE(nn.Module):
-    def __init__(self, dim, theta=10000.0, device="cuda"):
+    def __init__(self, initializing_function: Literal["linear", "llama3"] = "linear", **kwargs):
         super().__init__()
-        
-        inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.int64).float().to(device) / dim))
+        if initializing_function == "linear":
+            inv_freq,att_scaling = _linear_rope(**kwargs)
+        elif initializing_function == "llama3":
+            inv_freq,att_scaling = _llama3_rope(**kwargs)
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.original_inv_freq = self.inv_freq
+        self.att_scaling = att_scaling
         
     @torch.no_grad()
     def forward(self, x,B,SQLEN):
@@ -44,8 +64,8 @@ class RoPE(nn.Module):
         with torch.autocast(device_type=device_type, enabled=False):
             freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(1, 2)
             emb = torch.cat((freqs, freqs), dim=-1)
-            cos = emb.cos()
-            sin = emb.sin()
+            cos = emb.cos() * self.att_scaling
+            sin = emb.sin() * self.att_scaling
         return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
     
     def rot(x):
@@ -92,11 +112,14 @@ def repeat_intrleave(x, n):
 
 class Attention(nn.Module):
    
-    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, device = "cuda", linear_implementation = "torch", drop_out_p = 0.0):
+    def __init__(self, dmodel, num_heads, ctx_size, num_kv_heads = None, head_dim = None, device = "cuda", linear_implementation = "torch", drop_out_p = 0.0):
         
         super().__init__()
         self.n_kv_heads = num_heads if num_kv_heads is None else num_kv_heads
-        self.head_dim = dmodel // num_heads
+        if head_dim == None:
+            self.head_dim = dmodel // num_heads
+        else:
+            self.head_dim = head_dim
         self.num_heads = num_heads
         self.drop_out_p = drop_out_p
         self.scaling = self.head_dim**-0.5
@@ -219,12 +242,12 @@ class FeedForward(nn.Module):
 
 # CHECKED
 class TransformerBlock(nn.Module):
-    def __init__(self, dmodel, num_heads, ctx_size, norm_eps = 1e-6, hidden_dim = None, num_kv_heads = None, idx = None, device = "cuda", linear_implementation = "torch"):
+    def __init__(self, dmodel, num_heads, ctx_size, norm_eps = 1e-6, hidden_dim = None, num_kv_heads = None, idx = None, dropout_prob = 0, head_dim = None, device = "cuda", linear_implementation = "torch"):
         super().__init__()
         self.n_heads = num_heads
         self.dim = dmodel
-        self.head_dim = dmodel // num_heads
-        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation,num_kv_heads=num_kv_heads)
+        
+        self.self_attn = Attention(dmodel,num_heads,ctx_size,device=device,linear_implementation=linear_implementation,num_kv_heads=num_kv_heads, head_dim=head_dim, drop_out_p = dropout_prob)
         self.mlp = FeedForward(
             dim=dmodel,
             hidden_dim= hidden_dim,
