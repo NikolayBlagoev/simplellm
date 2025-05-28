@@ -160,49 +160,41 @@ class LLama(IterableModule, nn.Module):
         #print(*args) 
         return self.lm_head(self.model(x,**kwargs))
 
+    @torch.no_grad()
+    def _expand(self, inp: torch.Tensor, resample):
+        if resample == 1:
+            return inp
+        inp = inp.repeat_interleave(resample,dim = 0)
+        return inp
     @torch.inference_mode()
-    def generate(self, inp, tokenizer, max_gen_len: int, *args):
-        pad_id = tokenizer.pad_id
-        tokens = torch.full((1, self.max_seq), pad_id, dtype=torch.long, device=self.device)
-        tokens[1,: inp.shape[0]] = inp
-        head = 0
-        eos_reached = False
-        input_text_mask = tokens != pad_id
+    def generate(self, inp, max_new_tokens, temperature=1.0, top_k=None, resamples = 1, pad_id = 0, eos_id = None, **kwargs):
+        inp = self._expand(inp,resample)
+        if eos_id != None:
+            unfinished_sequences = torch.ones(inp.shape[0], dtype=torch.long, device=inp.device)
         
+        start_pos = inp.shape[1]
+        for cur_pos in range(max_new_tokens):
+            outputs = self.forward(inp,**kwargs)
+            next_token_logits = outputs.logits[:, -1, :].to(copy=True, dtype=torch.float32, device=inp.device)
+            if temperature == 0:
+                _, next_token = torch.topk(next_token_logits, k=1, dim=-1)
+            else:
+                next_token_logits /= temperature
+                if top_k is not None:
+                    v, _ = torch.topk(next_token_logits, min(top_k, next_token_logits.size(-1)))
+                    logits[logits < v[:, [-1]]] = -float('Inf')
+                probs = F.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            if eos_id != None:
+                next_token = next_token * unfinished_sequences + pad_id * (1 - unfinished_sequences)
+            inp = torch.cat([inp, next_token[:, None]], dim=-1)
+            if eos_id != None:
+                unfinished_sequences = unfinished_sequences & (next_token == eos_id)
+                if unfinished_sequences.sum() == 0:
+                    break 
+            del outputs
+        return inp
 
-        for cur_pos in range(inp.shape[0], inp.shape[0] + max_gen_len):
-            logits = self.model.forward(tokens[:, head:cur_pos],*args)
-            next_token = torch.argmax(logits[:, -1], dim=-1)
-
-            next_token = next_token.reshape(-1)
-            
-            next_token = torch.where(
-                input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
-            )
-            tokens[:, cur_pos] = next_token
-            
-            eos_reached |= (~input_text_mask[:, cur_pos]) & (
-                next_token == self.tokenizer.eos_id
-            )
-            
-            if all(eos_reached):
-                break
-
-        
-        out_tokens = []
-        for i, toks in enumerate(tokens.tolist()):
-
-            start = 0
-            toks = toks[start : inp.shape[0] + max_gen_len]
-            
-            
-            if self.tokenizer.eos_id in toks:
-                eos_idx = toks.index(self.tokenizer.eos_id)
-                toks = toks[:eos_idx]
-                
-            out_tokens.append(toks)
-            
-        return out_tokens
     
 
 class LLamaStage(IterableModule, nn.Module):

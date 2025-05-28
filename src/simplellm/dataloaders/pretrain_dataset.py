@@ -4,7 +4,7 @@ from datasets import load_dataset
 from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 from torch.utils.data import DataLoader, IterableDataset
 
-class AbstractDataset(IterableDataset):
+class PretrainDataset(IterableDataset):
     def __init__(self, dataset, tokenizer, seq_length=2048):
         self.dataset = dataset
         self.tokenizer = tokenizer
@@ -14,14 +14,14 @@ class AbstractDataset(IterableDataset):
         tmp = []
         for txt in self.dataset:
             
-            tmp += [self.tokenizer.bos_id] + txt['text']
+            tmp += txt['text']
             
             while len(tmp) >= self.seq_length:
                 tmp_x = tmp[:self.seq_length]
                 tmp =  tmp[self.seq_length:]
                 to_yield = torch.tensor(tmp_x)
                 yield to_yield
-            tmp = []
+            
             
 
     def get_stream(self):
