@@ -11,7 +11,7 @@ class GSM(_AbstractDataset):
 
     def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0, skip = 0, 
                     dataset_type = PretrainDataset):
-        dataset = load_dataset("openai/gsm8k", split=split,streaming = streaming, trust_remote_code=True)
+        dataset = load_dataset("openai/gsm8k", "main", split=split,streaming = streaming, trust_remote_code=True)
         
         super().__init__(dataset,tokenizer,batch_size,seq_l,num_workers,skip,dataset_type)
     def tokenization(self, t):
