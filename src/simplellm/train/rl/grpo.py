@@ -16,6 +16,7 @@ def _calc_log_probs(net: LLama, x, mask) -> torch.Tensor:
 
 @dataclass
 class Experience:
+    outputs: torch.Tensor
     original_log_probs: torch.Tensor
     ref_log_probs: torch.Tensor
     rewards: torch.Tensor
@@ -55,6 +56,7 @@ def pre_GRPO(net, net_ref, tokenizer, ds, loss_func, repeat, temperature, **kwar
             kl = kl_loss(original_log_probs, ref_log_probs, msk)
             arr.append(
                 Experience(
+                    outputs=outputs.to("cpu"),
                     original_log_probs=original_log_probs.to("cpu"),
                     ref_log_probs=ref_log_probs.to("cpu"),
                     rewards=rewards.to("cpu"),
@@ -77,6 +79,7 @@ def GRPO(net, optimizer, tokenizer, ds, loss_func, repeat, temperature, mb_size 
     arr: List[Experience] = pre_GRPO(net,net,tokenizer,ds,loss_func,repeat,temperature, **kwargs)
     for _ in range(epochs):
         random.shuffle(arr)
+        k = 0
         while k < len(arr):
             optimizer.zero_grad()
             if len(arr) - k < mb_size:
