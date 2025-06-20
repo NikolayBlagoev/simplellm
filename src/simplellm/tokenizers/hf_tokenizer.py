@@ -22,3 +22,6 @@ class HFTokenizer(AbstractTokenizer):
 
     def decode(self, tokens: list[int]) -> str:
         return self.tkns.decode(tokens)
+    
+    def batch_decode(self, *args, **kwargs):
+        return self.tkns.batch_decode(*args, **kwargs)
