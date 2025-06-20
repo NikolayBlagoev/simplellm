@@ -21,6 +21,7 @@ class CompletionDataset(IterableDataset):
                 x = []
             x += txt['prompt']
             y = txt['completion']
+            print(x,y)
             if "additional" not in txt:
                 yield {"prompt": [[x]], "completion": [[y]]}
             else:
