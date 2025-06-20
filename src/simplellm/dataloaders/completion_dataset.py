@@ -13,12 +13,14 @@ class CompletionDataset(IterableDataset):
     def get_data(self):
         print(self.dataset)
         for txt in self.dataset:
+            print("in looooop")
+            print(txt['prompt'])
             if self.tokenizer.bos_id != None:
 
                 x = [self.tokenizer.bos_id]
             else:
                 x = []
-            x += txt['text']
+            x += txt['prompt']
             y = txt['completion']
             if "additional" not in txt:
                 yield {"prompt": [x], "completion": [y]}

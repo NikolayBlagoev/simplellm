@@ -19,6 +19,6 @@ class GSM(_AbstractDataset):
 
     def completion_tokenization(self,t):
         print(t)
-        return {"question": self.tokenizer.encode(t["question"]), "answer": self.tokenizer.encode(t["answer"])}
+        return {"prompt": self.tokenizer.encode(t["question"]), "completion": self.tokenizer.encode(t["answer"])}
 
 
