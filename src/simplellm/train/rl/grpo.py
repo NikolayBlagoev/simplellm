@@ -4,6 +4,7 @@ import torch
 from ...llama import LLama
 from ...tokenizers.abstracttokenizer import AbstractTokenizer
 from dataclasses import dataclass
+import torch.nn.functional as F
 from typing import List
 from ...losses.kl_divergence import kl_loss
 from ...losses.grpo_loss import grpo_loss
@@ -26,7 +27,7 @@ class Experience:
 @torch.no_grad()
 def rollout(net: LLama, data, completion, loss_func, tokenizer: AbstractTokenizer, repeat = 10, top_k = 5, **kwargs):
     net.eval()
-    outputs = net.generate(data, max_new_tokens=512, eos_id=tokenizer.eos_id, pad_id=tokenizer.eos_id, resamples=repeat, top_k = top_k, **kwargs)
+    outputs = net.generate(data.to(net.device), max_new_tokens=512, eos_id=tokenizer.eos_id, pad_id=tokenizer.eos_id, resamples=repeat, top_k = top_k, **kwargs)
     msk = torch.zeros_like(outputs, dtype=torch.bool)
     msk[:, data.shape[1] : ] = True 
     msk[outputs == tokenizer.eos_id] = False
