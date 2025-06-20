@@ -8,3 +8,4 @@ from .openwebtext import OpenWebText
 from .redpyjamas2 import RedPyjamav2
 from .completion_dataset import CompletionDataset
 from .ft_dataset import FinetuneDataset
+from .gsm import GSM
