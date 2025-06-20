@@ -11,7 +11,7 @@ class CompletionDataset(IterableDataset):
         self.seq_length = seq_length
 
     def get_data(self):
-        
+        print(self.dataset)
         for txt in self.dataset:
             if self.tokenizer.bos_id != None:
 
