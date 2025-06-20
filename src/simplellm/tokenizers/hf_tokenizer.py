@@ -8,7 +8,7 @@ class HFTokenizer(AbstractTokenizer):
         self.tkns = AutoTokenizer.from_pretrained(tokenizer_name)
         self.vocab_size: int = self.tkns.vocab_size
         self.bos_id: int = self.tkns(self.tkns.bos_token).input_ids[0]
-        self.eos_id: int = self.tkns(self.tkns.eos_token).input_ids[0]
+        print(self.tkns.config)
         self.pad_id: int = 0
         
         
