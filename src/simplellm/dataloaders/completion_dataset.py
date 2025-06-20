@@ -23,7 +23,7 @@ class CompletionDataset(IterableDataset):
             y = txt['completion']
             print(x,y)
             if "additional" not in txt:
-                yield {"prompt": [[x]], "completion": [[y]]}
+                yield {"prompt": [torch.tensor(x)], "completion": [torch.tensor(y)]}
             else:
                 yield {"prompt": [x], "completion": [y], "additional": [txt["additional"]]}
 
