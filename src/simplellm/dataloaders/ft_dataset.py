@@ -13,8 +13,11 @@ class FinetuneDataset(IterableDataset):
     def get_data(self):
         
         for txt in self.dataset:
-            
-            tmp = [self.tokenizer.bos_id] + txt['text']
+            if self.tokenizer.bos_id != None:
+                tmp = [self.tokenizer.bos_id]
+            else:
+                tmp = []
+            tmp = tmp + txt['text']
             
             while len(tmp) >= self.seq_length:
                 tmp_x = tmp[:self.seq_length-1] + [self.tokenizer.eos_id]
