@@ -43,7 +43,7 @@ def pre_GRPO(net, net_ref, tokenizer, ds, loss_func, repeat, temperature, **kwar
     arr: List[Experience] = []
     for el in ds:
         prompts = el["prompt"]
-        completions = el["completions"]
+        completions = el["completion"]
         for p, c in zip(prompts,completions):
             outputs, rewards, msk = rollout(net, p, c, loss_func, tokenizer, repeat, temperature, **kwargs)
             # Normalize rewards:

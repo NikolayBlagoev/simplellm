@@ -11,10 +11,9 @@ class CompletionDataset(IterableDataset):
         self.seq_length = seq_length
 
     def get_data(self):
-        print(self.dataset)
+        
         for txt in self.dataset:
-            print("in looooop")
-            print(txt['prompt'])
+           
             if self.tokenizer.bos_id != None:
 
                 x = [self.tokenizer.bos_id]
@@ -23,7 +22,7 @@ class CompletionDataset(IterableDataset):
             x += txt['prompt']
             y = txt['completion']
             if "additional" not in txt:
-                yield {"prompt": [x], "completion": [y]}
+                yield {"prompt": [[x]], "completion": [[y]]}
             else:
                 yield {"prompt": [x], "completion": [y], "additional": [txt["additional"]]}
 
