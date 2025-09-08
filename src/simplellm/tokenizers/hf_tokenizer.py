@@ -4,8 +4,8 @@ from simplellm.tokenizers.abstracttokenizer import AbstractTokenizer
 
 class HFTokenizer(AbstractTokenizer):
     
-    def __init__(self, tokenizer_name):
-        self.tkns = AutoTokenizer.from_pretrained(tokenizer_name)
+    def __init__(self, tokenizer_name, token = None):
+        self.tkns = AutoTokenizer.from_pretrained(tokenizer_name, token = token)
         self.vocab_size: int = self.tkns.vocab_size
         print(self.tkns.bos_token)
         if self.tkns.bos_token != None:
