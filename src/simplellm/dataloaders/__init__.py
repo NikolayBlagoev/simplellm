@@ -9,3 +9,4 @@ from .redpyjamas2 import RedPyjamav2
 from .completion_dataset import CompletionDataset
 from .ft_dataset import FinetuneDataset
 from .gsm import GSM
+from .gutenberg_project import Gutenberg_Project
