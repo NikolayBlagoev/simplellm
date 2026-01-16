@@ -9,9 +9,9 @@ from._abstract_dataset import _AbstractDataset
 class RedPyjamav2(_AbstractDataset):
     
 
-    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0,name = "default", skip = 0, 
+    def __init__(self, tokenizer: AbstractTokenizer, streaming = True, batch_size = 5_000, seq_l=2048, split = 'train',num_workers=0, name = "default", partition = "all", skip = 0, 
                     dataset_type = PretrainDataset):
-        dataset = load_dataset("togethercomputer/RedPajama-Data-V2", name=name, streaming = streaming, trust_remote_code=True,languages=["en"], split="train")
+        dataset = load_dataset("togethercomputer/RedPajama-Data-V2", name=name, streaming = streaming, trust_remote_code=True,languages=["en"], split="train",partition=partition)
         
         super().__init__(dataset,tokenizer,batch_size,seq_l,num_workers,skip,dataset_type)
     def tokenization(self, t):
