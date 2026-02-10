@@ -194,6 +194,9 @@ class Attention(nn.Module):
         
         
         if use_flash:
+            query = query.transpose(1, 2)
+            key = key.transpose(1, 2)
+            value = value.transpose(1, 2)
             o = flash_attn_kernel.fwd(
                 q=xq.to(torch.bfloat16), 
                 k=xk.to(torch.bfloat16), 
