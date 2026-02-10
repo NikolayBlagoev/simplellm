@@ -5,7 +5,14 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from ..utils import *
-
+use_flash = False
+try:
+    from kernels import get_kernel
+    flash_attn_kernel = get_kernel("kernels-community/flash-attn2")
+    use_flash = True
+except ImportError:
+    print("[WARN] Not using flash attention")
+    pass
 # CORRECT
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6, device = "cuda"):
@@ -189,16 +196,23 @@ class Attention(nn.Module):
         xq = xq.contiguous()
         xv = xv.contiguous()
         xk = xk.contiguous()
-        # TODO: Implement self...
         
-        o = F.scaled_dot_product_attention(
-            xq,
-            xk,
-            xv,
-            attn_mask=None,
-            is_causal=True,
-            scale = self.scaling
-        ).transpose(1, 2).contiguous()
+        if use_flash:
+            o = flash_attn_kernel.fwd(
+                q=xq, 
+                k=xk, 
+                v=xv, 
+                is_causal=True,
+            )[0]
+        else:
+            o = F.scaled_dot_product_attention(
+                xq,
+                xk,
+                xv,
+                attn_mask=None,
+                is_causal=True,
+                scale = self.scaling
+            ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
         o = self.o_proj(o)
         
