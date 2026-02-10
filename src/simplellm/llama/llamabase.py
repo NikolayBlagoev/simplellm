@@ -201,6 +201,7 @@ class Attention(nn.Module):
                 q=xq.to(torch.bfloat16), 
                 k=xk.to(torch.bfloat16), 
                 v=xv.to(torch.bfloat16), 
+                softmax_scale = self.scaling,
                 causal=True,
             )
             if isinstance(o, tuple):
