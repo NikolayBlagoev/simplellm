@@ -199,11 +199,11 @@ class Attention(nn.Module):
         
         if use_flash:
             o = flash_attn_kernel.fwd(
-                q=xq, 
-                k=xk, 
-                v=xv, 
+                q=xq.to(torch.bfloat16), 
+                k=xk.to(torch.bfloat16), 
+                v=xv.to(torch.bfloat16), 
                 is_causal=True,
-            )[0]
+            )[0].float()
         else:
             o = F.scaled_dot_product_attention(
                 xq,
