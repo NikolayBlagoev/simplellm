@@ -197,7 +197,7 @@ class Attention(nn.Module):
             xq = xq.transpose(1, 2)
             xk = xk.transpose(1, 2)
             xv = xv.transpose(1, 2)
-            o = flash_attn_kernel(
+            o = flash_attn_kernel.flash_attn_func(
                 q=xq.to(torch.bfloat16), 
                 k=xk.to(torch.bfloat16), 
                 v=xv.to(torch.bfloat16), 
