@@ -201,7 +201,7 @@ class Attention(nn.Module):
                 q=xq.to(torch.bfloat16), 
                 k=xk.to(torch.bfloat16), 
                 v=xv.to(torch.bfloat16), 
-                is_causal=True,
+                causal=True,
             )[0].to(torch.float32)
             # print(o.shape)
         else:
