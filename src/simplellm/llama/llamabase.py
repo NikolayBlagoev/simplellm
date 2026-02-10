@@ -203,7 +203,8 @@ class Attention(nn.Module):
                 k=xk.to(torch.bfloat16), 
                 v=xv.to(torch.bfloat16), 
                 is_causal=True,
-            )[0].float()
+            )[0].to(torch.float32)
+            print(o.shape)
         else:
             o = F.scaled_dot_product_attention(
                 xq,
@@ -214,6 +215,7 @@ class Attention(nn.Module):
                 scale = self.scaling
             ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
+        print(o.shape)
         o = self.o_proj(o)
         
         return o
