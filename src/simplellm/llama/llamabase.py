@@ -191,11 +191,7 @@ class Attention(nn.Module):
 
         xq, xk = apply_rotary_emb(xq, xk, cos, sin)
         
-        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
-        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
-        xq = xq.contiguous()
-        xv = xv.contiguous()
-        xk = xk.contiguous()
+        
         
         if use_flash:
             o = flash_attn_kernel.fwd(
@@ -206,6 +202,11 @@ class Attention(nn.Module):
             )[0].to(torch.float32)
             print(o.shape)
         else:
+            xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
+            xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+            xq = xq.contiguous()
+            xv = xv.contiguous()
+            xk = xk.contiguous()
             o = F.scaled_dot_product_attention(
                 xq,
                 xk,
