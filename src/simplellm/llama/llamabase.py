@@ -5,7 +5,14 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from ..utils import *
-
+use_flash = False
+try:
+    from kernels import get_kernel
+    flash_attn_kernel = get_kernel("kernels-community/flash-attn2")
+    use_flash = True
+except ImportError:
+    print("[WARN] Not using flash attention")
+    pass
 # CORRECT
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6, device = "cuda"):
@@ -184,22 +191,35 @@ class Attention(nn.Module):
 
         xq, xk = apply_rotary_emb(xq, xk, cos, sin)
         
-        xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
-        xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
-        xq = xq.contiguous()
-        xv = xv.contiguous()
-        xk = xk.contiguous()
-        # TODO: Implement self...
         
-        o = F.scaled_dot_product_attention(
-            xq,
-            xk,
-            xv,
-            attn_mask=None,
-            is_causal=True,
-            scale = self.scaling
-        ).transpose(1, 2).contiguous()
+        
+        if use_flash:
+            query = query.transpose(1, 2)
+            key = key.transpose(1, 2)
+            value = value.transpose(1, 2)
+            o = flash_attn_kernel.fwd(
+                q=xq.to(torch.bfloat16), 
+                k=xk.to(torch.bfloat16), 
+                v=xv.to(torch.bfloat16), 
+                is_causal=True,
+            )[0].to(torch.float32)
+            print(o.shape)
+        else:
+            xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
+            xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
+            xq = xq.contiguous()
+            xv = xv.contiguous()
+            xk = xk.contiguous()
+            o = F.scaled_dot_product_attention(
+                xq,
+                xk,
+                xv,
+                attn_mask=None,
+                is_causal=True,
+                scale = self.scaling
+            ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
+        print(o.shape)
         o = self.o_proj(o)
         
         return o
