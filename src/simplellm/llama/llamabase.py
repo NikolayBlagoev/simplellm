@@ -202,7 +202,10 @@ class Attention(nn.Module):
                 k=xk.to(torch.bfloat16), 
                 v=xv.to(torch.bfloat16), 
                 causal=True,
-            )[0].to(torch.float32)
+            )
+            if isinstance(o, tuple):
+                o = o[0]
+            o = o.to(torch.float32)
             print(o.shape)
         else:
             xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
