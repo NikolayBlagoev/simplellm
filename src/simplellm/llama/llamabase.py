@@ -206,7 +206,7 @@ class Attention(nn.Module):
             if isinstance(o, tuple):
                 o = o[0]
             o = o.to(torch.float32)
-            print(o.shape)
+            # print(o.shape)
         else:
             xk = repeat_intrleave(xk, self.num_heads // self.n_kv_heads)
             xv = repeat_intrleave(xv, self.num_heads // self.n_kv_heads)
@@ -222,7 +222,7 @@ class Attention(nn.Module):
                 scale = self.scaling
             ).transpose(1, 2).contiguous()
         o = o.reshape(bsz, seqlen, -1).contiguous()
-        print(o.shape)
+        # print(o.shape)
         o = self.o_proj(o)
         
         return o
